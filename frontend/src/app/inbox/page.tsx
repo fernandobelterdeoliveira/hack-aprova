@@ -237,11 +237,11 @@ export default function InboxPage() {
     <div className="space-y-4">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
-          <h1 className="page-title">Caixa de entrada</h1>
+          <h1 className="page-title">Fila</h1>
           {pendingCount > 0 && <Badge className="border-0 bg-accent text-accent-foreground shadow-none">{pendingCount} para revisar</Badge>}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={load} aria-label="Atualizar caixa de entrada"><RefreshCw className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={load} aria-label="Atualizar fila"><RefreshCw className="h-4 w-4" /></Button>
           <NewItemDialog open={newOpen} onOpenChange={setNewOpen} onCreated={async () => { setNewOpen(false); await load() }} />
         </div>
       </div>
