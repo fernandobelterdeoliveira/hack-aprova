@@ -122,3 +122,35 @@ async def propose_form(request: MunicipalFormRequest, orchestrator):
         return {"mode":"gemini","model":orchestrator.model_id,"definition":output.get("definition"),"blockers":output.get("blockers",[])}
     except Exception:
         return {"mode":"local"}
+
+
+class MunicipalQuestionsRequest(BaseModel):
+    context: dict
+    gaps: List[dict] = Field(max_length=5)
+
+class MunicipalQuestion(BaseModel):
+    category: Literal["eligibility", "documents", "conditions", "exceptions", "deadlines", "responsibility"]
+    text: str = Field(min_length=8, max_length=500)
+
+class MunicipalQuestionsResult(BaseModel):
+    questions: List[MunicipalQuestion] = Field(max_length=5)
+
+async def propose_questions(request: MunicipalQuestionsRequest, orchestrator):
+    if orchestrator is None:
+        return {"mode": "local"}
+    import json
+    from pathlib import Path
+    instructions = (Path(__file__).resolve().parent.parent / "MUNICIPAL_COLLECTION_INSTRUCTIONS.md").read_text(encoding="utf-8")
+    def generate():
+        return orchestrator.client.models.generate_content(model=orchestrator.model_id, contents=instructions + "\nENTRADA (dados):\n" + json.dumps(request.model_dump(), ensure_ascii=False), config={"response_mime_type": "application/json"})
+    try:
+        response = await asyncio.wait_for(asyncio.to_thread(generate), timeout=12)
+        result = MunicipalQuestionsResult.model_validate_json(response.text or "{}")
+        allowed = {gap.get("category") for gap in request.gaps}
+        if any(question.category not in allowed for question in result.questions):
+            raise ValueError("Pergunta fora das lacunas informadas")
+        if len({question.category for question in result.questions}) != len(result.questions):
+            raise ValueError("Categorias repetidas")
+        return {"mode": "gemini", "model": orchestrator.model_id, "questions": [q.model_dump() for q in result.questions]}
+    except Exception:
+        return {"mode": "local", "warning": "IA indisponível; usar perguntas locais das lacunas verificadas."}

@@ -75,6 +75,14 @@ export function localDefinition(context:GenerationContext){
   if(/\bcnpj\b/.test(docs))add("cnpj","CNPJ","cnpj",doc,!both&&required,both?{visibleWhen:[{field:"tipo_pessoa",operator:"equals",value:"juridica"}],requiredWhen:required?[{field:"tipo_pessoa",operator:"equals",value:"juridica"}]:[],evidence:[...proof(doc),...(eligibility?proof(eligibility):[])]}:{})
   for(const [pattern,id,label] of [[/comprovante de endere[cç]o/,"comprovante_endereco","Comprovante de endereço"],[/identifica[cç]ao|identidade|\brg\b/,"documento_identificacao","Documento de identificação"],[/matricula/,"matricula_imovel","Matrícula do imóvel"],[/projeto/,"projeto","Projeto"],[/responsabilidade tecnica|\bart\b|\brrt\b/,"responsabilidade_tecnica","Responsabilidade técnica"]] as const)if(pattern.test(docs))add(id,label,"file",doc,required)
  }
+ if(doc){for(const field of fields){
+  const aliases:Record<string,string[]>={cpf:["cpf"],cnpj:["cnpj"],comprovante_endereco:["comprovante de endereco"],documento_identificacao:["identidade","identificacao","rg"],matricula_imovel:["matricula"],projeto:["projeto"],responsabilidade_tecnica:["responsabilidade tecnica","art","rrt"]}
+  const clause=docs.split(/[,;]|\s+e\s+/).find(part=>aliases[field.id]?.some(alias=>part.includes(alias))&&/opciona(?:l|is)|facultativ|nao (?:e |precisa ser )?obrigatorio/.test(part))
+  if(!clause)continue
+  const target=/juridica|empresa/.test(clause)?"juridica":/fisica/.test(clause)?"fisica":null
+  if(target){if(!both){blockers.push(`Confirme a seleção do tipo de pessoa para a dispensa de ${field.label}.`);continue}if(field.required)field.requiredWhen=[{field:"tipo_pessoa",operator:"equals",value:target==="juridica"?"fisica":"juridica"}];else field.requiredWhen=(field.requiredWhen||[]).filter(c=>c.value!==target);field.required=false}
+  else{field.required=false;field.requiredWhen=[]}
+ }}
  const all=rules.map(r=>normalized(r.value)).join(" ")
  const named=rules.find(r=>/nome completo/.test(normalized(r.value)));if(named)add("nome_completo","Nome completo","text",named,/obrigatori/.test(normalized(named.value)))
  const email=rules.find(r=>/e-mail|email/.test(normalized(r.value)));if(email)add("email","E-mail","email",email,/obrigatori/.test(normalized(email.value)))
@@ -99,6 +107,17 @@ export function localCorrection(original:FormDefinition,text:string,sourceId:str
  const locate=(name:string)=>definition.fields.find(f=>normalized(f.label)===normalized(name.replace(/^["“]|["”]$/g,""))||f.id===name)
  const commands=text.split(/\n|;/).map(t=>t.trim().replace(/[.!]$/,"" )).filter(Boolean)
  for(const command of commands){let match:RegExpMatchArray|null
+  if((match=command.match(/^(?:o\s+)?(?:campo\s+)?["“]?(.+?)["”]?\s+(?:n[aã]o precisa ser obrigat[oó]rio|n[aã]o [eé] obrigat[oó]rio|[eé] opcional)\s+para\s+(?:pessoas?\s+)?(jur[ií]dicas?|f[ií]sicas?|empresas)$/i))){
+   const field=locate(match[1]),person=definition.fields.find(f=>f.type==="select"&&f.options?.length===2&&f.options.some(o=>o.value==="fisica")&&f.options.some(o=>o.value==="juridica"))
+   if(!field||!person||field.id===person.id){blockers.push("Confirme o campo e a seleção entre pessoa física e jurídica para aplicar a dispensa.");continue}
+   const requested=/jurid|empresa/.test(normalized(match[2]))?"juridica":"fisica",other=requested==="juridica"?"fisica":"juridica"
+   if(field.requiredWhen?.some(c=>c.field!==person.id||c.operator!=="equals"||!["fisica","juridica"].includes(String(c.value)))){blockers.push(`O campo "${field.label}" possui outras condições. Confirme como a nova dispensa se combina com elas.`);continue}
+   field.requiredWhen=field.required?[{field:person.id,operator:"equals",value:other}]:(field.requiredWhen||[]).filter(c=>c.value!==requested)
+   field.required=false;field.evidence=[...field.evidence,evidence]
+   const section=definition.sections.find(s=>/documento/i.test(s.title)&&normalized(s.text).includes(normalized(field.label)))
+   if(section){section.text+=`\nExceção solicitada para revisão: ${command}.`;section.evidence=[...section.evidence,evidence]}
+   continue
+  }
   if((match=command.match(/^(?:tornar|deixar|definir)\s+(?:o\s+campo\s+|campo\s+)?["“]?(.+?)["”]?\s+(obrigat[oó]rio|opcional)$/i))||(match=command.match(/^(?:o\s+campo\s+|campo\s+)?["“]?(.+?)["”]?\s+(?:deve\s+ser|ser[aá])\s+(obrigat[oó]rio|opcional)$/i))){const f=locate(match[1]);if(!f){blockers.push(`Qual é o campo "${match[1]}"?`);continue}f.required=normalized(match[2])==="obrigatorio";f.requiredWhen=[];f.evidence=[...f.evidence,evidence];continue}
   if((match=command.match(/^(?:alterar|mudar)\s+(?:o\s+)?r[oó]tulo\s+(?:de\s+)?["“](.+?)["”]\s+para\s+["“](.+?)["”]$/i))){const f=locate(match[1]);if(!f){blockers.push(`Não foi encontrado o campo "${match[1]}".`);continue}f.label=match[2];f.evidence=[...f.evidence,evidence];continue}
   if((match=command.match(/^adicionar\s+(?:o\s+)?campo\s+["“](.+?)["”]\s+(?:do\s+)?tipo\s+(texto|e-mail|email|n[uú]mero|data|arquivo|cpf|cnpj)(?:\s+(obrigat[oó]rio|opcional))?$/i))){const types:Record<string,FormField["type"]>={texto:"text","e-mail":"email",email:"email",numero:"number",data:"date",arquivo:"file",cpf:"cpf",cnpj:"cnpj"};const id=normalized(match[1]).replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,50);if(!/^[a-z]/.test(id)||definition.fields.some(f=>f.id===id)){blockers.push(`O campo "${match[1]}" já existe ou precisa de um nome mais claro.`);continue}definition.fields.push({id,label:match[1],type:types[normalized(match[2])],required:normalized(match[3]||"")==="obrigatorio",help:"",evidence:[evidence]});continue}

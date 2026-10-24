@@ -1,0 +1,6 @@
+import {NextRequest,NextResponse} from "next/server"
+import {currentActor} from "@/lib/auth/current-actor"
+import {sameOrigin} from "@/lib/request-origin"
+import {collectionContext,generateCollectionQuestions,CollectionError} from "@/lib/municipal/collection"
+export async function GET(_req:NextRequest,ctx:{params:Promise<{id:string}>}){try{const actor=await currentActor(),{id}=await ctx.params;const context=await collectionContext(actor.workspaceId,id);return NextResponse.json({ticketId:context.ticketId,questions:context.questions,missing:context.missing})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Falha ao consultar perguntas."},{status:e instanceof CollectionError?e.status:500})}}
+export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}){if(!sameOrigin(req))return NextResponse.json({error:"Origem inválida."},{status:403});try{const actor=await currentActor();if(!["owner","admin","member","professional","reviewer"].includes(actor.role))return NextResponse.json({error:"Sem permissão para operar este processo."},{status:403});const{id}=await ctx.params;return NextResponse.json(await generateCollectionQuestions(actor.workspaceId,id))}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Falha ao gerar perguntas."},{status:e instanceof CollectionError?e.status:500})}}

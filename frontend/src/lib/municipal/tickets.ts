@@ -1,3 +1,4 @@
+import {interpretCollectionAnswer} from "./collection-domain"
 import {createHash,randomBytes,timingSafeEqual} from "node:crypto"
 import {Prisma,type MunicipalFormVersion} from "@prisma/client"
 import {prisma} from "@/lib/prisma"
@@ -36,11 +37,11 @@ export async function enqueueTicket(ticketId:string,operation:"generate"|"messag
  const stableKey=expectedContextHash?`context:${expectedContextHash}`:key
  return prisma.backgroundJob.upsert({where:{deduplicationKey:`ticket:${digest(`${ticketId}:${operation}:${stableKey}`)}`},update:{},create:{workspaceId:ticket.workspaceId,type:TICKET_JOB,payload:{ticketId,operation,messageId:messageId||null,expectedContextHash},status:"queued",createdBy:actor,progressMessage:operation==="deliver"?"Aguardando envio pelo conector":"Processando Ticket",deduplicationKey:`ticket:${digest(`${ticketId}:${operation}:${stableKey}`)}`,maxAttempts:operation==="deliver"?1:3,timeoutMs:120000}})
 }
-export async function appendTicketInput(input:{workspaceId:string;ticketId:string;content:string;author:string;externalKey:string;channel?:string;versionId?:string;decision?:"accept"|"changes";storageId?:string;inboxItemId?:string;whatsappMessageId?:string;resolvePending?:boolean;extractionPending?:boolean;information?:boolean}){
+export async function appendTicketInput(input:{workspaceId:string;ticketId:string;content:string;author:string;externalKey:string;channel?:string;versionId?:string;decision?:"accept"|"changes";storageId?:string;inboxItemId?:string;whatsappMessageId?:string;resolvePending?:boolean;extractionPending?:boolean;information?:boolean;collectionQuestionId?:string}){
  const ticket=await prisma.municipalTicket.findFirst({where:{id:input.ticketId,workspaceId:input.workspaceId}});if(!ticket)throw new Error("Ticket não encontrado.")
  const previous=await prisma.municipalTicketMessage.findUnique({where:{externalKey:input.externalKey}})
  if(previous){if(previous.ticketId!==ticket.id||previous.originalContent!==input.content)throw new Error("Identificador de mensagem reutilizado com outro conteúdo.");await enqueueTicket(ticket.id,"message",input.author,previous.id,previous.id);return previous}
- const message=await prisma.municipalTicketMessage.create({data:{workspaceId:input.workspaceId,ticketId:ticket.id,content:input.content,originalContent:input.content,author:input.author,externalKey:input.externalKey,channel:input.channel||"internal",direction:"received",kind:input.decision==="changes"?"change_request":input.decision==="accept"?"acceptance":"text",formVersionId:input.versionId,storageId:input.storageId,inboxItemId:input.inboxItemId,whatsappMessageId:input.whatsappMessageId,metadata:json({decision:input.decision||null,resolvePending:input.resolvePending||false,extractionPending:input.extractionPending||Boolean(input.storageId),sourceInformation:input.information||false})}})
+ const message=await prisma.municipalTicketMessage.create({data:{workspaceId:input.workspaceId,ticketId:ticket.id,content:input.content,originalContent:input.content,author:input.author,externalKey:input.externalKey,channel:input.channel||"internal",direction:"received",kind:input.decision==="changes"?"change_request":input.decision==="accept"?"acceptance":"text",formVersionId:input.versionId,storageId:input.storageId,inboxItemId:input.inboxItemId,whatsappMessageId:input.whatsappMessageId,metadata:json({decision:input.decision||null,resolvePending:input.resolvePending||false,extractionPending:input.extractionPending||Boolean(input.storageId),sourceInformation:input.information||false,collectionQuestionId:input.collectionQuestionId||null})}})
  await enqueueTicket(ticket.id,"message",input.author,message.id,message.id)
  return message
 }
@@ -59,7 +60,7 @@ async function createVersion(ticketId:string,key:string,actor:string,requestMess
  const context=contextOf(ticket.process)
  const resolved=manualDefinition?{definition:definitionSchema.parse(manualDefinition),blockers:definitionIssues(manualDefinition),mode:"professional-edit"}:await resolveForm(context,request&&previous?definitionSchema.parse(previous.definition):undefined,request?{id:request.id,content:request.content}:undefined)
  if(resolved.definition.context.processId!==ticket.processId||resolved.definition.context.municipality!==ticket.process.municipality||resolved.definition.context.department!==ticket.process.department||resolved.definition.context.owner!==ticket.process.owner)throw new Error("Definição pertence a outro contexto.")
- const evidence=new Map(context.sources.map(s=>[s.id,s.content]));const allRequests=await prisma.municipalTicketMessage.findMany({where:{ticketId,direction:"received"},select:{id:true,content:true}});for(const item of allRequests)evidence.set(item.id,item.content)
+ const evidence=new Map(context.sources.map(s=>[s.id,s.content]));const allRequests=await prisma.municipalTicketMessage.findMany({where:{ticketId,direction:"received"},select:{id:true,content:true}});for(const item of allRequests)if(!evidence.has(item.id))evidence.set(item.id,item.content)
  for(const item of [...resolved.definition.fields,...resolved.definition.sections])for(const proof of item.evidence){const source=evidence.get(proof.sourceId);if(!source||!(proof.excerpt.trim()&&proof.excerpt.split("\n").filter(line=>line.trim()).every(line=>source.includes(line))))throw new Error("Há campos ou regras sem fonte verificável neste Ticket.")}
  const requestMetadata=(request?.metadata||{}) as Record<string,unknown>
  const carried=request&&previous&&!requestMetadata.resolvePending?previous.blockers as string[]:[]
@@ -112,7 +113,24 @@ async function addInformation(ticketId:string,messageId:string){
  const sources=ticket.process.sources as unknown as Source[];const id=message.id
  if(!sources.some(s=>s.id===id)){
   const source:Source={id,name:message.author,content:message.content,type:message.channel,createdAt:message.createdAt.toISOString(),storageId:message.storageId||undefined,inboxId:message.inboxItemId||undefined}
-  const rules=await proposeWithAgent(ticket.process.rules as unknown as Rule[],source)
+  let rules:Rule[]
+  const questionId=typeof metadata.collectionQuestionId==="string"?metadata.collectionQuestionId:null
+  const question=questionId?await prisma.municipalTicketMessage.findFirst({where:{id:questionId,ticketId,kind:"question",workspaceId:ticket.workspaceId}}):null
+  if(questionId&&!question)throw new Error("Pergunta não pertence a este Ticket.")
+  if(question){
+   const category=(question.metadata as {category:Rule["category"]}).category
+   const interpreted=interpretCollectionAnswer(category,message.content)
+   source.content=`Pergunta: ${question.content}\nResposta: ${message.content}`;source.analysisMode="local:targeted-answer-v1"
+   rules=(ticket.process.rules as unknown as Rule[]).map(rule=>{
+    if(rule.category!==category)return rule
+    const revision={...rule,version:rule.version+1,status:"proposed" as const,approvalCode:crypto.randomUUID().slice(0,8).toUpperCase()}
+    if(!interpreted.value)return{...revision,conflict:{value:message.content,sourceId:source.id,excerpt:message.content}}
+    if(rule.status==="approved"&&rule.value!==interpreted.value)return{...revision,conflict:{value:interpreted.value,sourceId:source.id,excerpt:source.content}}
+    return{...revision,value:interpreted.value,sourceId:source.id,excerpt:source.content,conflict:undefined,approvedBy:undefined,approvedAt:undefined}
+   })
+   const pending=rules.some(r=>r.category===category&&r.conflict)
+   await prisma.municipalTicketMessage.update({where:{id:question.id},data:{metadata:json({...question.metadata as Record<string,unknown>,collectionStatus:pending?"needs_clarification":"answered",answerMessageId:message.id,clarification:interpreted.question||null})}})
+  }else rules=await proposeWithAgent(ticket.process.rules as unknown as Rule[],source)
   const result=await prisma.municipalProcess.updateMany({where:{id:ticket.processId,workspaceId:ticket.workspaceId,version:ticket.process.version},data:{sources:json([...sources,source]),rules:json(rules),version:{increment:1},status:"collecting",history:json([...(ticket.process.history as unknown as Audit[]),{at:new Date().toISOString(),actor:message.author,action:"ticket_information",details:`Informação recebida pelo Ticket ${ticket.id}`}])}})
   if(!result.count)throw new Error("O processo recebeu outra informação. A tarefa será retomada.")
  }

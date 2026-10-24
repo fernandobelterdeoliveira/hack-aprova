@@ -378,6 +378,11 @@ async def municipal_propose(request: MunicipalSourceRequest):
 async def municipal_form(request: MunicipalFormRequest):
     return await propose_form(request, orchestrator)
 
+from municipal_extractor import MunicipalQuestionsRequest, propose_questions
+@app.post("/api/municipal/questions")
+async def municipal_questions(request: MunicipalQuestionsRequest):
+    return await propose_questions(request, orchestrator)
+
 # Main entry point
 if __name__ == "__main__":
     print("""
