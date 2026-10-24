@@ -2,8 +2,8 @@ import {writeFile,mkdir} from "node:fs/promises"
 const base="http://127.0.0.1:3001"
 async function api(path,options={}){const r=await fetch(base+path,options),body=await r.json();if(!r.ok)throw new Error(body.error);return body}
 const processes=(await api("/api/municipal")).processes
-const process=processes.find(p=>p.municipality==="DEMONSTRAÇÃO — Município Horizonte")
-if(!process)throw new Error("Execute seed-municipal-demo.mjs para preparar o exemplo fictício.")
+const process=processes.find(p=>p.id==="municipal-showcase-v1-serra-alvara")
+if(!process)throw new Error("Execute npm run seed:municipal-showcase para preparar os cenários municipais fictícios.")
 const list=await api(`/api/tickets?process=${process.id}`),summary=list.tickets.find(t=>t.processId===process.id)
 let ticket=await api(`/api/tickets/${summary.id}`)
 if(!ticket.currentVersionId)await api(`/api/tickets/${ticket.id}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"generate",requestKey:crypto.randomUUID()})})

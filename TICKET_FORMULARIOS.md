@@ -71,3 +71,17 @@ Suítes executadas:
 Os testes usam registros temporários e não enviam mensagens externas. A comparação de IDs com o backup não encontrou registros originais ausentes nas tabelas verificadas de casos, mensagens, arquivos, perfis e conectores. O backup anterior está indicado em ticket-backup-path.txt. Capturas e relatórios ficam em artifacts.
 
 A demonstração existente ganhou um formulário real preenchível, identificado como fictício, aguardando análise da prefeitura. Não foi feito ensaio de carga de 400 usuários simultâneos, deploy público, teste com credenciais reais dos provedores nem integração de publicação na Aprova.
+
+
+## Cenários municipais para apresentação
+
+Na pasta `frontend`, execute `npm run seed:municipal-showcase` com o sistema e o worker iniciados. O comando prepara seis processos em quatro prefeituras fictícias e pode ser repetido sem duplicar os registros. Os cenários usam fontes próprias, responsáveis identificados e operações reais do fluxo local:
+
+- Serra Clara: alvará aprovado após correção e teste; reforma residencial corrigida aguardando validação profissional.
+- Vale das Araucárias: transporte escolar rural em análise pela prefeitura.
+- Rio Dourado: licença sanitária com solicitação ambígua, pendente de esclarecimento.
+- Santa Aurora: revisão cadastral em análise e reserva de espaço público em coleta de informações.
+
+Os exemplos são identificados nas telas e nas fontes como demonstração, sem validade normativa. Não há envio externo, integração simulada como conectada, linha de base inventada ou promessa de ganho. O tempo do fluxo representa a execução local do cenário, não uma implantação real.
+
+Antes de substituir o antigo exemplo Município Horizonte, o comando salva os processos municipais, versões, mensagens e tarefas em `backups/municipal-showcase-*.json`. A remoção fica limitada ao exemplo municipal antigo reconhecido pelo nome e pela fonte. Os demais dados existentes são preservados. Links locais ficam em `artifacts/municipal-showcase.json`; esses arquivos contêm acessos de revisão e não entram no Git.

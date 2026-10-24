@@ -62,6 +62,7 @@ function MunicipalWorkspace() {
    {tab === "history" && <section className={box}><h3 className="mb-4 font-semibold">Trilha de revisão</h3>{[...process.history].reverse().map((h,i) => <div key={i} className="border-b py-3 text-sm"><p className="font-medium">{h.details}</p><p className="mt-1 text-xs text-slate-500">{new Date(h.at).toLocaleString("pt-BR")} · {h.actor}</p></div>)}</section>}
    {busy && <div className="fixed bottom-5 right-5 flex items-center gap-2 rounded-lg bg-slate-900 p-3 text-sm text-white shadow-lg"><Loader2 className="h-4 w-4 animate-spin" />Salvando…</div>}
   </>}
+  {(process?process.sources.some(source=>source.type==="demonstration"):processes.some(item=>item.sources.some(source=>source.type==="demonstration")))&&<p className="rounded-lg border bg-white px-4 py-3 text-xs leading-5 text-slate-500">Ambiente de demonstração municipal · prefeituras, pessoas e regras dos exemplos são fictícias. Aprovações e testes pertencem a esses cenários; não representam entregas externas nem ganhos medidos.</p>}
   {importing && <MunicipalImport close={()=>setImporting(false)} done={()=>{setImporting(false);void load();setNotice("Processos importados. Regras aguardam coleta e aprovação.")}} />}
   {creating && <CreateProcess close={() => {setCreating(false);if(new URLSearchParams(query).has("new"))router.replace("/municipal")}} created={async (p) => { await load();setSelected(p.id);setCreating(false);setTab("sources");router.replace(`/municipal?process=${p.id}`) }} />}
  </div>

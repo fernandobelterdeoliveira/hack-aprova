@@ -19,7 +19,8 @@
     "jobs:worker": "node --require ./scripts/tsx-windows-shim.cjs --env-file=.env.local --import tsx scripts/job-worker.ts",
     "jobs:once": "node --require ./scripts/tsx-windows-shim.cjs --env-file=.env.local --import tsx scripts/job-worker.ts --once",
     "test:jobs": "node --require ./scripts/tsx-windows-shim.cjs --env-file=.env.local --import tsx scripts/background-jobs-test.ts",
-    "test:security": "node --env-file=.env.local scripts/workspace-isolation-test.mjs"
+    "test:security": "node --env-file=.env.local scripts/workspace-isolation-test.mjs",
+    "seed:municipal-showcase": "node --require ./scripts/tsx-windows-shim.cjs --env-file=.env.local --import tsx scripts/seed-municipal-showcase.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.23",
