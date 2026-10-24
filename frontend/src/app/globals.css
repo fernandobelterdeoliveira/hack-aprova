@@ -271,3 +271,174 @@
   [data-density="compact"] [data-slot="card-content"],
   [data-density="compact"] [data-slot="card-footer"] { padding-inline: 1rem; }
 }
+
+
+/* Focused polish for the existing Ticket and municipal form surfaces. */
+.ticket-workspace,
+.ticket-form-dialog,
+.municipal-form {
+  --ticket-focus: #087f62;
+  --ticket-hover: #f1f7f5;
+  --ticket-chat: #efeae2;
+}
+.ticket-panel {
+  box-shadow: 0 2px 8px rgb(32 40 58 / 4%);
+}
+.ticket-workspace :is(button, a, input, select, textarea, summary),
+.ticket-form-dialog :is(button, a, input, select, textarea, summary),
+.municipal-form :is(button, a, input, select, textarea, summary) {
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+.ticket-workspace :is(button, a, input, select, textarea, summary):focus-visible,
+.ticket-form-dialog :is(button, a, input, select, textarea, summary):focus-visible,
+.municipal-form :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--ticket-focus);
+  outline-offset: 3px;
+}
+.ticket-search {
+  border: 1px solid transparent;
+}
+.ticket-search:focus-within {
+  border-color: var(--ticket-focus);
+  box-shadow: 0 0 0 2px rgb(8 127 98 / 10%);
+}
+.ticket-search input:focus-visible {
+  outline: none;
+}
+.ticket-panel aside button[aria-pressed="true"] {
+  background: var(--brand-soft);
+}
+.ticket-panel aside button[aria-pressed="true"] span.font-medium {
+  color: var(--brand-strong);
+  font-weight: 600;
+}
+.ticket-panel aside :is(button, a):hover {
+  background-color: var(--ticket-hover);
+}
+.ticket-panel aside a[aria-label] {
+  display: grid;
+  min-width: 28px;
+  min-height: 28px;
+  place-items: center;
+  border-radius: 6px;
+}
+.ticket-panel aside p.uppercase {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  padding-bottom: 8px;
+}
+.ticket-messages {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #a4b3ab transparent;
+}
+.ticket-bubble {
+  padding: 12px 14px;
+  box-shadow: 0 1px 2px rgb(32 40 58 / 8%);
+}
+.ticket-bubble > p:first-child {
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+.ticket-event {
+  width: fit-content;
+  padding: 8px 16px;
+  border: 1px solid rgb(255 255 255 / 45%);
+}
+.ticket-event time,
+.ticket-bubble > div.text-right {
+  font-size: 11px;
+}
+.ticket-composer {
+  border-top: 1px solid var(--border);
+}
+.ticket-composer select {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.ticket-composer textarea {
+  border: 1px solid transparent;
+}
+.ticket-composer textarea:focus {
+  border-color: var(--ticket-focus);
+}
+.ticket-workspace button.bg-emerald-700:hover:not(:disabled),
+.ticket-form-dialog button.bg-emerald-700:hover:not(:disabled),
+.municipal-form button.bg-emerald-700:hover:not(:disabled) {
+  background-color: #065f46;
+}
+.ticket-form-tabs {
+  gap: 4px;
+  overflow-x: auto;
+}
+.ticket-form-tabs button {
+  flex-shrink: 0;
+  min-height: 44px;
+  font-weight: 500;
+}
+.ticket-form-tabs button:hover {
+  background-color: var(--ticket-hover);
+}
+.municipal-form > .grid {
+  gap: 20px;
+}
+.municipal-form :is(input:not([type="checkbox"]), select, textarea) {
+  min-height: 44px;
+  border-color: var(--input);
+  background-color: var(--card);
+}
+.municipal-form :is(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--destructive);
+  box-shadow: 0 0 0 1px var(--destructive);
+}
+.municipal-form input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 5px;
+  background-color: var(--secondary);
+  color: var(--foreground);
+  font-weight: 500;
+  cursor: pointer;
+}
+.municipal-form details {
+  background-color: var(--secondary);
+  line-height: 1.6;
+}
+.dark .ticket-workspace,
+.dark .ticket-form-dialog,
+.dark .municipal-form {
+  --ticket-focus: #70d7b5;
+  --ticket-hover: #252e2b;
+}
+.dark .ticket-messages {
+  background-color: var(--background);
+}
+.dark .ticket-bubble {
+  background-color: var(--card);
+}
+.dark .ticket-bubble.bg-\[\#d9fdd3\] {
+  background-color: #193d31;
+}
+.dark .ticket-event {
+  background-color: var(--card);
+  border-color: var(--border);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticket-workspace *, .ticket-form-dialog *, .municipal-form * {
+    transition: none;
+  }
+}
+@media (max-width: 639px) {
+  .ticket-bubble {
+    max-width: 94%;
+  }
+  .ticket-form-dialog {
+    padding: 20px 16px;
+  }
+  .ticket-form-dialog select {
+    max-width: 100%;
+  }
+}
