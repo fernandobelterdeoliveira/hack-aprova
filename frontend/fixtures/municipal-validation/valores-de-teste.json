@@ -1,0 +1,24 @@
+{
+  "demonstration": true,
+  "fisica": {
+    "tipo_pessoa": "fisica",
+    "cpf": "52998224725",
+    "comprovante_endereco": [
+      {
+        "name": "comprovante-ficticio.txt",
+        "size": 180,
+        "type": "text/plain"
+      }
+    ]
+  },
+  "juridica": {
+    "tipo_pessoa": "juridica",
+    "cnpj": "11222333000181",
+    "comprovante_endereco": []
+  },
+  "invalidCNPJ": {
+    "tipo_pessoa": "juridica",
+    "cnpj": "123",
+    "comprovante_endereco": []
+  }
+}

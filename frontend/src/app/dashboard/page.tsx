@@ -103,7 +103,7 @@ export default function DashboardPage() {
         <div>
           <p className="eyebrow mb-2">Visão operacional</p>
           <h1 className="page-title">Visão geral</h1>
-          <p className="mt-2 text-sm text-slate-500">{today} · Veja o que precisa de atenção nos seus casos.</p>
+          <p className="mt-2 text-sm text-slate-500">{today} · Veja o que precisa de atenção nos processos municipais.</p>
         </div>
         <Button asChild className="action-primary h-10 rounded-lg px-4">
           <Link href="/actions">Abrir fila de revisão <ArrowRight className="ml-2 h-4 w-4" /></Link>
@@ -113,11 +113,11 @@ export default function DashboardPage() {
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           icon={FileStack}
-          label="Casos em andamento"
+          label="Processos municipais em andamento"
           value={stats.activeCases}
           note={stats.closedCases === 0
             ? "Nenhum caso encerrado"
-            : `${stats.closedCases} ${stats.closedCases === 1 ? "caso encerrado" : "casos encerrados"}`}
+            : `${stats.closedCases} ${stats.closedCases === 1 ? "processo concluído" : "processos concluídos"}`}
         />
         <Metric icon={ShieldCheck} label="Aguardando revisão" value={stats.pendingActions} note="Aprovação humana necessária" accent />
         <Metric icon={MessageSquareText} label="Novas comunicações" value={stats.recentCommunications} note="Últimos 7 dias" />
@@ -128,8 +128,8 @@ export default function DashboardPage() {
         <div className="surface-card overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
             <div>
-              <h2 className="font-semibold tracking-tight text-slate-900">Casos prioritários</h2>
-              <p className="mt-1 text-xs text-slate-500">Casos com próxima ação pendente ou risco elevado</p>
+              <h2 className="font-semibold tracking-tight text-slate-900">Municípios prioritários</h2>
+              <p className="mt-1 text-xs text-slate-500">Processos com próxima ação pendente ou risco elevado</p>
             </div>
             <Link href="/cases" className="text-xs font-semibold text-[#3157d5] hover:text-[#2747b3]">Ver todos</Link>
           </div>

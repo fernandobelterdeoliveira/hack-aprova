@@ -27,7 +27,7 @@ type Contradiction = { id: string; title: string; confidence: number; values: Ar
 type SearchResult = { answer: string; matches: Array<{ kind: string; title: string; text: string; source: Source; confidence?: number | null; status: string }> }
 
 interface OperationalCase {
-  case: { id: string; caseNumber: string; clientName: string; clientEmail?: string | null; clientPhone?: string | null; clientDob?: string | null; caseType: string; status: string; priority: string; assignedTo: string; createdAt: string; lastActivity: string; description: string; nextAction: string }
+  case: { municipalProcess?: {id:string;name:string;department:string;ticket:{id:string;status:string;currentVersionId:string|null}|null}|null; id: string; caseNumber: string; clientName: string; clientEmail?: string | null; clientPhone?: string | null; clientDob?: string | null; caseType: string; status: string; priority: string; assignedTo: string; createdAt: string; lastActivity: string; description: string; nextAction: string }
   summary: { text: string; stage: string; healthScore?: number | null; updatedAt: string; generatedBy: string; sources: Source[]; warnings: string[] }
   stats: { documents: number; pendingTasks: number; openGaps: number; alerts: number; pendingReviews: number }
   primaryData: { client: Array<{ dataId: string; removable: boolean; label: string; value?: string | null; status: string; source: Source }>; extracted: Fact[] }
@@ -209,12 +209,13 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="mx-auto max-w-[1500px] space-y-8 pb-12">
       <header className="border-b border-border pb-6">
-        <Link href="/cases" className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />Todos os casos</Link>
+        <Link href="/cases" className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />Todos os municípios</Link>
         <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-start">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3"><h1 className="page-title">{data.case.clientName}</h1><Badge variant="outline">{data.case.caseNumber}</Badge></div>
             <p className="mt-2 text-sm text-muted-foreground">{data.case.caseType} · Responsável: <span className="font-medium text-foreground">{data.case.assignedTo}</span></p>
             <p className="mt-1 text-xs text-muted-foreground">Atualizado {relativeDate(data.case.lastActivity)}</p>
+            {data.case.municipalProcess&&<div className="mt-3 flex flex-wrap gap-4 text-xs font-medium text-emerald-700"><Link href={`/municipal?process=${data.case.municipalProcess.id}`}>Regras e fontes municipais →</Link>{data.case.municipalProcess.ticket&&<Link href={`/communications?ticket=${data.case.municipalProcess.ticket.id}`}>Abrir Ticket e formulário →</Link>}</div>}
           </div>
           <Select value={data.case.status} onValueChange={updateStatus}><SelectTrigger className="w-full sm:w-[170px]"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(statusLabel).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select>
         </div>

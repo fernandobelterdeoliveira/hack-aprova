@@ -40,6 +40,14 @@ Use `requestKey: crypto.randomUUID()` por operação. Reenvie a mesma chave e os
 | `GET /api/jobs/{jobId}` | Consultar tarefa existente, quando seu ID for retornado |
 | `GET/POST /api/forms/review/{versionId}` | Revisão da prefeitura pelo link/token de acesso já existente |
 
+### Vínculo com Municípios e Caixa de entrada
+
+Os registros preparados têm `Case.municipalProcessId` associado ao processo correspondente. `GET /api/cases` mantém a rota por compatibilidade e inclui `municipalProcess` com prefeitura, secretaria, processo e Ticket. `GET /api/cases/{id}` expõe esse vínculo em `case.municipalProcess`; os fatos, documentos e histórico são consultáveis pelos mecanismos existentes.
+
+`GET /api/inbox` inclui o vínculo em `detectedCase.municipalProcess`. As entradas projetadas do Ticket são identificadas como registros locais, sem confiança de IA inventada nem entrega WhatsApp simulada. Fontes textuais podem ser baixadas em `GET /api/cases/{id}/municipal-evidence?source={sourceId}`, com a mesma autorização e isolamento por workspace.
+
+O worker atualiza registros municipais já vinculados após as operações do Ticket. O estado da aprovação final permanece no Ticket; se a sincronização da visão municipal falhar após a aprovação, a resposta pode conter `warning` e a aprovação continua registrada. A preparação `npm run seed:municipal-cases` também permite refazer essa projeção. Casos sem vínculo municipal não são alterados por esse serviço.
+
 ### 1. Criar e selecionar processo
 
 `POST /api/municipal` → 201:
@@ -233,4 +241,4 @@ O teste MVP cria processos fictícios isolados, gera perguntas, responde ambigui
 - Informação recebida pode gerar vários rascunhos durante a coleta. O front-end deve acompanhar `currentVersionId` e guardar `versionId` em cada solicitação.
 - Extração de PDF/Office/OCR/áudio e conectores continuam com as dependências/credenciais já existentes. Áudio necessita da IA configurada; o fluxo de texto demonstrado não depende disso.
 - Não há tramitação completa, publicação na Aprova, integração externa nova, dashboard novo ou promessa de redução medida de tempo. A aprovação final é sempre profissional.
-- Esta implementação não modifica páginas, componentes ou estilos. Alterações visuais que já existiam no diretório de trabalho antes desta tarefa não fazem parte desta entrega de back-end.
+- As APIs independem da navegação. Os dados preparados para o teste manual e o roteiro local estão em `DADOS_VALIDACAO.md`.

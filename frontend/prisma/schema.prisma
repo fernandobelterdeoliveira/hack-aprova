@@ -68,6 +68,8 @@ model Case {
   id           String    @id @default(cuid())
   workspaceId  String    @default("default-workspace")
   workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  municipalProcessId String? @unique
+  municipalProcess MunicipalProcess? @relation(fields: [municipalProcessId], references: [id], onDelete: SetNull)
   caseType     String
   clientName   String
   clientEmail  String?
@@ -644,6 +646,7 @@ model MunicipalProcess {
   contactPhone String?
   contactEmail String?
   ticket MunicipalTicket?
+  case Case?
   status String @default("collecting")
   targetDate DateTime?
   rules Json @default("[]")

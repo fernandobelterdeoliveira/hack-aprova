@@ -1,3 +1,4 @@
+import {municipalCaseInclude} from "@/lib/municipal/case-context"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     const items = await prisma.inboxItem.findMany({
       where: { workspaceId: actor.workspaceId, ...(status && status !== "all" ? { reviewStatus: status } : {}) },
       include: {
-        detectedCase: { select: { id: true, caseNumber: true, clientName: true, caseType: true } },
+        detectedCase: { select: { id: true, caseNumber: true, clientName: true, caseType: true, municipalProcess: municipalCaseInclude } },
         proposedChanges: { orderBy: { createdAt: "asc" } },
         processingRuns: { orderBy: { startedAt: "desc" }, take: 1 },
         aiExecutions: { orderBy: { startedAt: "desc" }, take: 10 },

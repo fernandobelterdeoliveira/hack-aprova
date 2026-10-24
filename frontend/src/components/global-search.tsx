@@ -60,7 +60,7 @@ export function GlobalSearch() {
         value={query}
         onChange={(event) => { setQuery(event.target.value); setOpen(true); if (event.target.value.trim().length < 2) setResults(emptyResults) }}
         onFocus={() => setOpen(true)}
-        aria-label="Pesquisar casos, clientes, documentos e mensagens"
+        aria-label="Pesquisar municípios, processos, documentos e mensagens"
         placeholder="Pesquisar..."
         className="h-10 w-full rounded-lg border border-border bg-muted/60 pl-10 pr-16 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 sm:pr-24"
       />
@@ -70,7 +70,7 @@ export function GlobalSearch() {
         <div className="absolute left-0 top-12 z-50 max-h-[min(70vh,520px)] w-[min(92vw,580px)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15">
           {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Pesquisando...</div> : hasResults ? (
             <div className="space-y-2">
-              <ResultGroup title="Casos" icon={BriefcaseBusiness}>{results.cases.map((item) => <ResultLink key={item.id} href={`/cases/${item.id}`} title={`${item.clientName} · #${item.caseNumber}`} detail={item.caseType} onOpen={() => setOpen(false)} />)}</ResultGroup>
+              <ResultGroup title="Municípios" icon={BriefcaseBusiness}>{results.cases.map((item) => <ResultLink key={item.id} href={`/cases/${item.id}`} title={`${item.clientName} · #${item.caseNumber}`} detail={item.caseType} onOpen={() => setOpen(false)} />)}</ResultGroup>
               <ResultGroup title="Caixa de entrada" icon={Inbox}>{results.inbox.map((item) => <ResultLink key={item.id} href={`/inbox?item=${item.id}`} title={item.senderName || item.senderEmail || "Remetente desconhecido"} detail={item.rawContent} onOpen={() => setOpen(false)} />)}</ResultGroup>
               <ResultGroup title="Documentos" icon={FileText}>{results.files.map((item) => <ResultLink key={item.id} href={`/cases/${item.case.id}`} title={item.name} detail={`${item.case.clientName} · #${item.case.caseNumber}`} onOpen={() => setOpen(false)} />)}</ResultGroup>
             </div>

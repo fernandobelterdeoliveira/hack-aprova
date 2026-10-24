@@ -19,7 +19,7 @@ const statusOptions: Array<{ value: CaseView; label: string }> = [
 ]
 
 const operationalOptions: Array<{ value: OperationalFilter; label: string }> = [
-  { value: "all", label: "Todos os casos" },
+  { value: "all", label: "Todos os municípios" },
   { value: "stale", label: "Sem atualização" },
   { value: "gaps", label: "Com lacunas" },
   { value: "risk", label: "Alto risco" },
@@ -53,7 +53,7 @@ export default function CasesPage() {
   useEffect(() => {
     fetch("/api/cases")
       .then((response) => {
-        if (!response.ok) throw new Error("Não foi possível carregar os casos")
+        if (!response.ok) throw new Error("Não foi possível carregar os municípios")
         return response.json()
       })
       .then(setCases)
@@ -102,19 +102,19 @@ export default function CasesPage() {
   }), [cases])
 
   if (loading) return <div className="grid min-h-[60vh] place-items-center"><Loader2 className="h-7 w-7 animate-spin text-[#3157d5]" /></div>
-  if (error) return <div className="surface-card grid min-h-[360px] place-items-center text-center"><div><CircleAlert className="mx-auto mb-3 h-8 w-8 text-rose-600" /><p className="font-semibold">Não foi possível carregar os casos</p><p className="mt-1 text-sm text-slate-500">{error}</p></div></div>
+  if (error) return <div className="surface-card grid min-h-[360px] place-items-center text-center"><div><CircleAlert className="mx-auto mb-3 h-8 w-8 text-rose-600" /><p className="font-semibold">Não foi possível carregar os municípios</p><p className="mt-1 text-sm text-slate-500">{error}</p></div></div>
 
   return (
     <div className="space-y-7">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <h1 className="page-title">Casos</h1>
+          <h1 className="page-title">Municípios</h1>
         </div>
-        <Button asChild className="action-primary h-10 rounded-lg px-4"><Link href="/cases/new"><Plus className="mr-2 h-4 w-4" />Novo caso</Link></Button>
+        <Button asChild className="action-primary h-10 rounded-lg px-4"><Link href="/municipal?new=1"><Plus className="mr-2 h-4 w-4" />Novo município</Link></Button>
       </div>
 
       <section>
-        <div className="mb-3 flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-600" /><h2 className="text-sm font-semibold">Casos que podem estar se perdendo</h2></div>
+        <div className="mb-3 flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-600" /><h2 className="text-sm font-semibold">Municípios que precisam de atenção</h2></div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <OperationalIndicator value={operationalCounts.stale} label="sem atualização há 10+ dias" active={operationalFilter === "stale"} onClick={() => setOperationalFilter(operationalFilter === "stale" ? "all" : "stale")} />
           <OperationalIndicator value={operationalCounts.gaps} label="com informação faltante" active={operationalFilter === "gaps"} onClick={() => setOperationalFilter(operationalFilter === "gaps" ? "all" : "gaps")} />
@@ -128,7 +128,7 @@ export default function CasesPage() {
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Buscar casos" className="h-10 border-slate-200 bg-slate-50/60 pl-10 shadow-none" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Buscar municípios" className="h-10 border-slate-200 bg-slate-50/60 pl-10 shadow-none" />
           </div>
           <div className="grid grid-cols-2 gap-1 rounded-lg bg-secondary p-1 sm:grid-cols-4">
             {statusOptions.map((option) => (
@@ -148,10 +148,10 @@ export default function CasesPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between"><p className="text-xs font-medium text-slate-500">{visibleCases.length} {visibleCases.length === 1 ? "caso" : "casos"}</p><p className="hidden text-[11px] text-slate-400 md:block">Ordenado por {sortBy === "activity" ? "última atividade" : "prioridade"}</p></div>
+      <div className="flex items-center justify-between"><p className="text-xs font-medium text-slate-500">{new Set(visibleCases.map(item=>item.municipalProcess?.municipality||item.clientName)).size} municípios · {visibleCases.length} {visibleCases.length === 1 ? "processo" : "processos"}</p><p className="hidden text-[11px] text-slate-400 md:block">Ordenado por {sortBy === "activity" ? "última atividade" : "prioridade"}</p></div>
 
       {visibleCases.length === 0 ? (
-        <div className="surface-card grid min-h-[320px] place-items-center text-center"><div><BriefcaseBusiness className="mx-auto mb-3 h-8 w-8 text-slate-300" /><p className="font-semibold">Nenhum caso encontrado</p><p className="mt-1 text-sm text-slate-400">Altere a pesquisa ou o filtro de status.</p></div></div>
+        <div className="surface-card grid min-h-[320px] place-items-center text-center"><div><BriefcaseBusiness className="mx-auto mb-3 h-8 w-8 text-slate-300" /><p className="font-semibold">Nenhum município encontrado</p><p className="mt-1 text-sm text-slate-400">Altere a pesquisa ou o filtro de status.</p></div></div>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {visibleCases.map((item) => <CaseCard key={item.id} item={item} />)}
@@ -177,11 +177,12 @@ function CaseCard({ item }: { item: Case }) {
         <Badge variant="outline" className="rounded-md border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-500">{statusLabel[item.status] || item.status}</Badge>
       </div>
 
+      {item.municipalProcess&&<p className="mt-3 text-xs font-medium text-emerald-700">{item.municipalProcess.department} · Processo municipal</p>}
       <p className="mt-5 line-clamp-2 min-h-10 text-sm leading-5 text-slate-500">{item.description}</p>
 
       <div className="mt-5 rounded-xl border border-slate-100 bg-[#f8faf7] p-3.5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Próxima ação</p>
-        <div className="mt-1.5 flex items-center justify-between gap-3"><p className="truncate text-sm font-medium text-slate-800">{item.nextAction || "Revisar e atualizar o estado do caso"}</p><ArrowUpRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-[#3157d5]" /></div>
+        <div className="mt-1.5 flex items-center justify-between gap-3"><p className="truncate text-sm font-medium text-slate-800">{item.nextAction || "Revisar e atualizar o estado do município"}</p><ArrowUpRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-[#3157d5]" /></div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-slate-400">

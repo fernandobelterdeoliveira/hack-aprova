@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   AlertTriangle,
@@ -73,7 +74,7 @@ type InboxItem = {
     embeddingProvider?: string
     candidates?: Array<{ caseId: string; caseNumber: string; clientName: string; caseType: string; score: number; signals: Array<{ detail: string; contribution: number }> }>
   } | null
-  detectedCase?: { id: string; caseNumber: string; clientName: string; caseType: string } | null
+  detectedCase?: { id: string; caseNumber: string; clientName: string; caseType: string; municipalProcess?:{id:string;name:string;ticket:{id:string}|null}|null } | null
   proposedChanges: ProposedChange[]
   processingRuns?: Array<{
     model: string
@@ -120,6 +121,8 @@ const reviewLabel: Record<string, string> = { pending: "Pendente", ready: "Pront
 const changeTypeLabel: Record<string, string> = { EVENT: "EVENTO", FACT: "FATO", TASK: "TAREFA", GAP: "LACUNA", GAP_RESOLUTION: "LACUNA RESOLVIDA", DEADLINE: "PRAZO" }
 const riskLabel: Record<string, string> = { low: "Baixo", medium: "Médio", high: "Alto", critical: "Crítico" }
 const classificationLabel: Record<string, string> = {
+  municipal_rules: "Regras do processo municipal",
+  municipal_changes: "Solicitação de ajuste no formulário",
   client_update: "Atualização do cliente",
   document: "Documento",
   medical_update: "Atualização médica",
@@ -311,7 +314,7 @@ export default function InboxPage() {
 
                   <section className="rounded-xl border border-border bg-card p-5">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Caso relacionado</p>
-                    {selected.detectedCase ? <div className="mt-3"><p className="text-sm font-semibold text-foreground">{selected.detectedCase.clientName}</p><p className="mt-1 text-xs text-muted-foreground">#{selected.detectedCase.caseNumber} · {selected.detectedCase.caseType}</p><div className="mt-4"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confiança da associação</p><p className="mt-1 text-2xl font-semibold text-foreground">{Math.round((selected.associationConfidence || 0) * 100)}%</p></div></div> : <div className="mt-3 flex gap-2 text-sm text-amber-700 dark:text-amber-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />Escolha o caso correto antes de aprovar.</div>}
+                    {selected.detectedCase ? <div className="mt-3"><p className="text-sm font-semibold text-foreground">{selected.detectedCase.clientName}</p><p className="mt-1 text-xs text-muted-foreground">#{selected.detectedCase.caseNumber} · {selected.detectedCase.caseType}</p><div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-emerald-700"><Link href={`/cases/${selected.detectedCase.id}`}>Abrir caso →</Link>{selected.detectedCase.municipalProcess?.ticket&&<Link href={`/communications?ticket=${selected.detectedCase.municipalProcess.ticket.id}`}>Ticket e formulário →</Link>}</div><div className="mt-4"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confiança da associação</p><p className="mt-1 text-2xl font-semibold text-foreground">{selected.associationConfidence===null||selected.associationConfidence===undefined?"Vínculo manual":`${Math.round(selected.associationConfidence*100)}%`}</p></div></div> : <div className="mt-3 flex gap-2 text-sm text-amber-700 dark:text-amber-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />Escolha o caso correto antes de aprovar.</div>}
                     <div className="mt-4 border-t border-border pt-4">
                       <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Alterar caso</Label>
                       <Select value={targetCaseId} onValueChange={setTargetCaseId}><SelectTrigger className="mt-2 h-9 text-xs"><SelectValue placeholder="Selecione um caso" /></SelectTrigger><SelectContent>{cases.map((item) => <SelectItem key={item.id} value={item.id}>{item.clientName} · {item.caseType}</SelectItem>)}</SelectContent></Select>

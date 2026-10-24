@@ -13,6 +13,7 @@ export interface Case {
   createdAt: string
   lastActivity: string
   description: string
+  municipalProcess?: {id:string;municipality:string;department:string;name:string;ticket:{id:string;status:string;currentVersionId:string|null}|null}|null
   nextAction?: string
   operational?: {
     staleDays: number

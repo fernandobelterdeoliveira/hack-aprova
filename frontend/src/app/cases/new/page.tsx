@@ -72,10 +72,10 @@ export default function NovoCasoPage() {
     <div className="mx-auto max-w-4xl space-y-7">
       <div>
         <Button asChild variant="ghost" className="mb-4 -ml-3 text-slate-500">
-          <Link href="/cases"><ArrowLeft className="mr-2 h-4 w-4" />Voltar para casos</Link>
+          <Link href="/cases"><ArrowLeft className="mr-2 h-4 w-4" />Voltar para municípios</Link>
         </Button>
         <p className="eyebrow mb-2">Novo cadastro</p>
-        <h1 className="page-title">Criar novo caso</h1>
+        <h1 className="page-title">Cadastrar município</h1>
         <p className="mt-2 text-sm text-slate-500">Cadastre o cliente, os dados iniciais e a próxima ação do escritório.</p>
       </div>
 

@@ -1,0 +1,27 @@
+{
+  "demonstration": true,
+  "municipality": "Prefeitura de Serra Clara",
+  "department": "Desenvolvimento Econômico",
+  "owner": "Marina Costa",
+  "author": "Carolina Mendes · demonstração",
+  "answers": {
+    "documents": "CPF, comprovante de endereço e, para empresas, CNPJ.",
+    "eligibility": "Pessoas físicas e jurídicas podem solicitar o serviço.",
+    "conditions": "A conferência documental deve ocorrer antes da aprovação.",
+    "exceptions": "Não há outras dispensas ou exceções neste processo.",
+    "deadlines": "10 dias úteis",
+    "responsibility": "A secretaria faz a triagem e o diretor aprova o pedido."
+  },
+  "correction": "O comprovante de endereço não precisa ser obrigatório para pessoa jurídica",
+  "ambiguous": "Ajustar os documentos conforme o caso",
+  "expected": {
+    "fisicaRequiresCPF": true,
+    "juridicaRequiresCNPJ": true,
+    "addressRequiredInitially": true,
+    "addressRequiredAfterCorrection": {
+      "fisica": true,
+      "juridica": false
+    },
+    "finalApprovalRequiresProfessionalTest": true
+  }
+}

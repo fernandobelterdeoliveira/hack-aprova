@@ -1,0 +1,7 @@
+Exemplo fictício para teste local.
+Pessoas físicas e jurídicas podem solicitar o serviço.
+Os documentos obrigatórios são CPF ou CNPJ e comprovante de endereço.
+A conferência documental deve ocorrer antes da aprovação.
+Não há outras dispensas ou exceções neste processo.
+O prazo de análise é de 10 dias úteis.
+A secretaria faz a triagem e o diretor aprova o pedido.

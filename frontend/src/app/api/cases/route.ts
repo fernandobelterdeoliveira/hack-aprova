@@ -1,3 +1,4 @@
+import {municipalCaseInclude,municipalCaseProgress} from "@/lib/municipal/case-context";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -31,6 +32,7 @@ export async function GET() {
             where: { workspaceId: actor.workspaceId },
             orderBy: { lastActivity: 'desc' },
             include: {
+                municipalProcess: municipalCaseInclude,
                 emails: {
                     select: { id: true }
                 },
@@ -55,13 +57,14 @@ export async function GET() {
             const staleDays = Math.floor((Date.now() - item.lastActivity.getTime()) / 86_400_000);
             return {
                 ...item,
+                ...(item.municipalProcess?municipalCaseProgress(item.municipalProcess.ticket):{}),
                 operational: {
                     staleDays,
                     hasGaps: item.informationGaps.length > 0,
                     highRisk: ["urgent", "high"].includes(item.priority) || item.proposedChanges.some((change) => ["high", "critical"].includes(change.riskLevel)),
                     hasDeadline: item.aiTasks.some((task) => task.category === "deadline"),
                     missingDocument: item.informationGaps.some((gap) => /documento|matrícula|certidão|comprovante|laudo/i.test(gap.title)),
-                    awaitingReview: item.proposedChanges.length > 0,
+                    awaitingReview: item.proposedChanges.length > 0 || item.municipalProcess?.ticket?.status === "awaiting_professional",
                     hasContradiction,
                     unassigned: !item.assignedTo.trim(),
                     unprocessedEntries: item.inboxItems.length,

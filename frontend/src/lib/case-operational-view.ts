@@ -1,3 +1,4 @@
+import {municipalCaseInclude,municipalCaseProgress} from "@/lib/municipal/case-context"
 import type { Prisma, PrismaClient } from "@prisma/client"
 
 type JsonRecord = Record<string, unknown>
@@ -71,6 +72,7 @@ export async function buildCaseOperationalView(db: PrismaClient, caseId: string,
     where: { id: caseId, workspaceId },
     include: {
       state: true,
+      municipalProcess: municipalCaseInclude,
       files: { orderBy: { uploadedAt: "desc" } },
       events: { orderBy: { occurredAt: "desc" } },
       facts: { where: { archivedAt: null }, orderBy: { extractedAt: "desc" } },
@@ -225,6 +227,8 @@ export async function buildCaseOperationalView(db: PrismaClient, caseId: string,
       clientPhone: lawCase.clientPhone, clientDob: lawCase.clientDob, caseType: lawCase.caseType, status: lawCase.status,
       priority: lawCase.priority, assignedTo: lawCase.assignedTo, createdAt: lawCase.createdAt, lastActivity: lawCase.lastActivity,
       description: lawCase.description, nextAction: lawCase.nextAction,
+      municipalProcess: lawCase.municipalProcess,
+      ...(lawCase.municipalProcess?municipalCaseProgress(lawCase.municipalProcess.ticket):{}),
     },
     summary: {
       text: lawCase.state?.summary || lawCase.description,
@@ -235,11 +239,11 @@ export async function buildCaseOperationalView(db: PrismaClient, caseId: string,
       sources: summarySources,
       warnings: summaryWarnings,
     },
-    stats: { documents: documents.length, pendingTasks: pendingTasks.length, openGaps: openGaps.length, alerts: priorityRisks.length, pendingReviews: pendingReview.length },
+    stats: { documents: documents.length, pendingTasks: pendingTasks.length, openGaps: openGaps.length, alerts: priorityRisks.length, pendingReviews: pendingReview.length + (lawCase.municipalProcess?.ticket?.status === "awaiting_professional" ? 1 : 0) },
     primaryData: {
       client: [
-        { dataId: "case:clientName", removable: false, label: "Nome", value: lawCase.clientName, source: source("case_record", lawCase.id), status: "confirmed" },
-        { dataId: "case:clientDob", removable: true, label: "Data de nascimento", value: lawCase.clientDob, source: source("case_record", lawCase.id), status: "pending" },
+        { dataId: "case:clientName", removable: false, label: lawCase.municipalProcess?"Prefeitura":"Nome", value: lawCase.clientName, source: source("case_record", lawCase.id), status: "confirmed" },
+        ...(!lawCase.municipalProcess?[{ dataId: "case:clientDob", removable: true, label: "Data de nascimento", value: lawCase.clientDob, source: source("case_record", lawCase.id), status: "pending" }]:[]),
         { dataId: "case:clientPhone", removable: true, label: "Telefone", value: lawCase.clientPhone, source: source("case_record", lawCase.id), status: lawCase.clientPhone ? "pending" : "missing" },
         { dataId: "case:clientEmail", removable: true, label: "E-mail", value: lawCase.clientEmail, source: source("case_record", lawCase.id), status: lawCase.clientEmail ? "pending" : "missing" },
       ],

@@ -1,3 +1,4 @@
+import {syncMunicipalCase} from "@/lib/municipal/case-sync"
 import {NextRequest,NextResponse} from "next/server"
 import {z} from "zod"
 import {prisma} from "@/lib/prisma"
@@ -83,6 +84,7 @@ export async function POST(req:NextRequest,ctx:Context){
    if(!tests.automatic?.passed||!tests.manual?.valid||tests.manual.actor!==actor.userProfileId||tests.manual.definitionHash!==digest(version.definition))throw new Error("Teste o preenchimento desta versão com seu usuário profissional antes de aprovar.")
    if((snapshot.contextHash||digest(contextOf(version.contextSnapshot as unknown as Parameters<typeof contextOf>[0])))!==digest(contextOf(ticket.process)))throw new Error("As regras do processo mudaram. Gere uma versão atualizada antes de aprovar.")
    await prisma.$transaction(async tx=>{await tx.$queryRaw`SELECT "id" FROM "MunicipalFormVersion" WHERE "id" = ${version.id} FOR UPDATE`;const fresh=await tx.municipalFormVersion.findUniqueOrThrow({where:{id:version.id}});const latestTests=fresh.testResults as typeof tests;if(!latestTests.manual?.valid||latestTests.manual.actor!==actor.userProfileId||latestTests.manual.definitionHash!==digest(fresh.definition))throw new Error("O resultado do teste mudou. Valide novamente antes de aprovar.");const lock=await tx.municipalTicket.updateMany({where:{id,revision:ticket.revision,currentVersionId:version.id},data:{status:"approved",approvedVersionId:version.id,revision:{increment:1}}});if(!lock.count)throw new Error("O Ticket mudou durante a aprovação.");await tx.municipalFormVersion.update({where:{id:version.id},data:{status:"approved",approvedBy:actor.userProfileId,approvedAt:new Date()}});await tx.municipalTicketMessage.create({data:{workspaceId:actor.workspaceId,ticketId:id,formVersionId:version.id,kind:"event",direction:"system",author:actor.userProfileId,content:`Validação final concluída. Formulário v${version.number} aprovado.`,externalKey:`approval:${version.id}`}})})
+   try{await syncMunicipalCase(id)}catch(error){console.error("Municipal case projection:",error);return NextResponse.json({approved:true,warning:"Aprovação registrada; a visão do município precisa ser sincronizada."})}
    return NextResponse.json({approved:true})
   }
   throw new Error("Operação indisponível.")

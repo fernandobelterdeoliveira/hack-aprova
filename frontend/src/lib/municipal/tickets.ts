@@ -1,3 +1,4 @@
+import {syncMunicipalCase} from "./case-sync"
 import {interpretCollectionAnswer} from "./collection-domain"
 import {createHash,randomBytes,timingSafeEqual} from "node:crypto"
 import {Prisma,type MunicipalFormVersion} from "@prisma/client"
@@ -208,6 +209,7 @@ export async function runTicketJob(payload:Prisma.JsonValue,workspaceId:string,j
  }
  const pending=await prisma.municipalTicketMessage.findMany({where:{ticketId:ticket.id,direction:"sent",deliveryStatus:"pending"},select:{id:true}})
  for(const message of pending)await enqueueTicket(ticket.id,"deliver","workflow",message.id,message.id)
+ await syncMunicipalCase(ticket.id)
  return{ticketId:ticket.id,operation:p.operation}
 }
 export async function manualFormVersion(workspaceId:string,ticketId:string,actor:string,definition:FormDefinition,requestKey:string,noteId?:string){
