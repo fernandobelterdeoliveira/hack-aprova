@@ -242,3 +242,22 @@ O teste MVP cria processos fictícios isolados, gera perguntas, responde ambigui
 - Extração de PDF/Office/OCR/áudio e conectores continuam com as dependências/credenciais já existentes. Áudio necessita da IA configurada; o fluxo de texto demonstrado não depende disso.
 - Não há tramitação completa, publicação na Aprova, integração externa nova, dashboard novo ou promessa de redução medida de tempo. A aprovação final é sempre profissional.
 - As APIs independem da navegação. Os dados preparados para o teste manual e o roteiro local estão em `DADOS_VALIDACAO.md`.
+
+
+### Revisar sugestões antes de enviar ao chat
+
+Perguntas, pedidos de esclarecimento e formulários sugeridos pelo sistema recebem `deliveryStatus: "awaiting_approval"`. O chat oculta esse estado e `superseded`. O Ticket (`GET /api/inbox`) contém propostas com `payload.municipalAction: "send_message"`, `ticketId`, `messageId` e, quando aplicável, `formVersionId`. Propostas de dados são salvas sem envio. Versões substituídas não podem ser compartilhadas pela proposta antiga.
+
+Aprovação: `PATCH /api/inbox/{id}/review`
+
+```json
+{"action":"approve","caseId":"municipio-associado","changeIds":["proposta-selecionada"]}
+```
+
+Resposta:
+
+```json
+{"applied":1,"rejected":0,"outgoing":[{"ticketId":"ticket-id","messageId":"mensagem-id"}],"sentToChat":1}
+```
+
+`sentToChat` indica publicação autorizada no chat, não comprovação de entrega externa. Sem conector, a mensagem permanece `internal`. Com conector, os estados `pending`, `sent`, `delivered` e `failed` registram o resultado real. Aprovação repetida não duplica o envio. Compartilhar o formulário para análise não substitui sua aprovação profissional final, que mantém os testes obrigatórios. Conectores ficam em `/settings?section=connectors`.

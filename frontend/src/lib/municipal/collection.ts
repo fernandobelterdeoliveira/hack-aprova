@@ -1,3 +1,4 @@
+import {syncMunicipalCase} from "./case-sync"
 import {prisma} from "@/lib/prisma"
 import {json} from "./service"
 import {ensureTicket,appendTicketInput,enqueueTicket,digest,contextOf} from "./tickets"
@@ -41,9 +42,10 @@ export async function generateCollectionQuestions(workspaceId:string,id:string){
  for(const candidate of candidates){
   if(!remaining.some(g=>g.category===candidate.category&&g.ruleVersion===candidate.ruleVersion))continue
   const key=`collection-question:${ticket.id}:${candidate.category}:${candidate.ruleVersion}`
-  const message=await prisma.municipalTicketMessage.upsert({where:{externalKey:key},update:{},create:{workspaceId,ticketId:ticket.id,kind:"question",direction:"sent",author:"Sistema",content:`${process.name}: ${candidate.text}`,externalKey:key,deliveryStatus:ticket.connectorAccountId?"pending":"internal",metadata:json({category:candidate.category,ruleVersion:candidate.ruleVersion,collectionStatus:"open",reason:candidate.reason,mode})}})
+  const message=await prisma.municipalTicketMessage.upsert({where:{externalKey:key},update:{},create:{workspaceId,ticketId:ticket.id,kind:"question",direction:"sent",author:"Sistema",content:`${process.name}: ${candidate.text}`,externalKey:key,deliveryStatus:"awaiting_approval",metadata:json({category:candidate.category,ruleVersion:candidate.ruleVersion,collectionStatus:"open",reason:candidate.reason,mode})}})
   if(message.deliveryStatus==="pending")await enqueueTicket(ticket.id,"deliver","collection",message.id,message.id)
  }
+ await syncMunicipalCase(ticket.id)
  const context=await collectionContext(workspaceId,id)
  return{ticketId:ticket.id,mode,...(warning?{warning}:{}),questions:context.questions.filter(q=>q.status==="open").slice(0,5),missing:context.missing}
 }

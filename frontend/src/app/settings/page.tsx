@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useTheme } from "next-themes"
-import { AlertTriangle, Bell, Check, CheckCircle2, Coins, Database, Download, FileArchive, Gauge, HardDrive, Loader2, MonitorCog, Palette, Save } from "lucide-react"
+import { AlertTriangle, Bell, Check, CheckCircle2, Coins, Database, Download, FileArchive, Gauge, HardDrive, Loader2, MonitorCog, Palette, Plug, Save } from "lucide-react"
+import { TicketConnectors } from "@/components/ticket-connectors"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,6 +28,7 @@ type Preferences = {
 type Usage = { headline: { totalTokens: number; currentMonthTokens: number; monthlyTokenLimit: number; remainingTokens: number; remainingTokenPercentage: number }; workspaceActivity: { cases: number; communications: number; storedFiles: number; storedBytes: number }; insights: { automationRuns: number } }
 
 const sections = [
+  { id: "connectors", label: "Conectores", icon: Plug },
   { id: "system", label: "Sistema", icon: MonitorCog },
   { id: "appearance", label: "Aparência", icon: Palette },
   { id: "notifications", label: "Notificações", icon: Bell },
@@ -80,8 +82,7 @@ export default function SettingsPage() {
     if (requestedSection && sections.some((item) => item.id === requestedSection)) setSection(requestedSection as SectionId)
     const connected = params.get("connected")
     const connectorError = params.get("connectorError")
-    if (connected || connectorError || requestedSection === "plugins") { window.location.replace(`/communications?section=connectors${connected ? `&connected=${encodeURIComponent(connected)}` : ""}${connectorError ? `&connectorError=${encodeURIComponent(connectorError)}` : ""}`); return }
-    if (requestedSection || connected || connectorError) window.history.replaceState({}, "", window.location.pathname)
+    if (connected || connectorError || requestedSection === "plugins") setSection("connectors")
   }, [])
 
   useEffect(() => {
@@ -145,6 +146,7 @@ export default function SettingsPage() {
         </nav>
 
         <div className="min-w-0">
+          {section === "connectors" && <TicketConnectors />}
           {section === "system" && <SystemSettings value={preferences} update={update} />}
           {section === "appearance" && <AppearanceSettings value={preferences} update={update} />}
           {section === "notifications" && <NotificationSettings value={preferences} update={update} />}

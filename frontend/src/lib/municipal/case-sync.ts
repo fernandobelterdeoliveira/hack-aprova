@@ -33,7 +33,29 @@ export async function syncMunicipalCase(ticketId:string){
    const update={detectedCaseId:record.id,...(original?.sourceExternalId?.startsWith("municipal-ticket:")&&original.reviewStatus!=="rejected"?{reviewStatus:source||ticket.status==="approved"||original.reviewStatus==="approved"?"approved":"ready",requiresHumanReview:!source&&ticket.status!=="approved"&&original.reviewStatus!=="approved"}:{})}
    await tx.inboxItem.upsert({where:{id:inboxId},update,create:{id:inboxId,workspaceId:ticket.workspaceId,sourceType:message.channel==="whatsapp"?"whatsapp":"manual",sourceExternalId:`municipal-ticket:${message.id}`,senderName:message.author,receivedAt:message.createdAt,rawContent,contentHash:hash(rawContent),detectedCaseId:record.id,associationConfidence:null,associationSignals:json({autoAssociated:false,manuallyAssigned:true,ticketId,municipalProcessId:p.id,demonstration:demo,candidates:[{caseId:record.id,clientName:p.municipality,caseType:p.name,signals:[{detail:"Vínculo explícito com o processo e o Ticket municipais.",contribution:1}]}]}),classification:source?"municipal_rules":"municipal_changes",processingStatus:"completed",reviewStatus:source||ticket.status==="approved"?"approved":"ready",requiresHumanReview:!source&&ticket.status!=="approved",decisionProvider:"municipal-ticket-local",riskLevel:source?"low":"medium"}})
    if(!message.inboxItemId)await tx.municipalTicketMessage.update({where:{id:message.id},data:{inboxItemId:inboxId}})
+   const review=await tx.inboxItem.findUniqueOrThrow({where:{id:inboxId}})
+   if(review.reviewStatus==="ready"&&!await tx.proposedCaseChange.count({where:{inboxItemId:inboxId}})){
+    const runId=`municipal-data-review-${message.id}`
+    await tx.inboxProcessingRun.upsert({where:{id:runId},update:{},create:{id:runId,inboxItemId:inboxId,model:"municipal-workflow",promptVersion:"data-review-v1",extractorVersion:"1",processingVersion:"1",status:"completed",completedAt:now}})
+    await tx.proposedCaseChange.create({data:{id:`municipal-data-${message.id}`,inboxItemId:inboxId,caseId:record.id,type:"FACT",processingRunId:runId,fingerprint:hash(message.id),confidence:1,riskLevel:"medium",sourceId:message.id,sourceType:"municipal_ticket",sourceExcerpt:message.content,payload:json({title:"Registrar informação recebida",fieldName:"Informação recebida pelo Ticket",value:{display:message.content,status:"confirmed"},description:message.content,municipalAction:"save_data"})}})
+   }
    inboxIds.set(message.id,inboxId);firstInbox??=inboxId
+  }
+  // Reuse the existing review queue for explicit outbound suggestions.
+  for(const message of ticket.messages.filter(m=>m.direction==="sent"&&m.deliveryStatus==="awaiting_approval")){
+   const obsolete=Boolean(message.formVersionId&&message.formVersionId!==ticket.currentVersionId)||(message.kind==="question"&&(message.metadata as Record<string,unknown>).collectionStatus==="answered")
+   if(obsolete){
+    await tx.municipalTicketMessage.update({where:{id:message.id},data:{deliveryStatus:"superseded"}})
+    await tx.inboxItem.updateMany({where:{id:`municipal-outgoing-${message.id}`,reviewStatus:{not:"approved"}},data:{reviewStatus:"rejected"}})
+    await tx.proposedCaseChange.updateMany({where:{id:`municipal-send-${message.id}`,status:"pending"},data:{status:"rejected",decidedBy:"municipal-workflow",decidedAt:now}})
+    continue
+   }
+   const inboxId=`municipal-outgoing-${message.id}`,runId=`municipal-review-${message.id}`,proposalId=`municipal-send-${message.id}`
+   const title=message.kind==="form"?`Enviar formulário v${ticket.versions.find(v=>v.id===message.formVersionId)?.number||String((message.metadata as Record<string,unknown>).version||"")}`:"Enviar mensagem sugerida"
+   const rawContent=message.kind==="form"?`${title} para análise da prefeitura. Revise o formulário antes de aprovar o envio.`:message.content
+   await tx.inboxItem.upsert({where:{id:inboxId},update:{},create:{id:inboxId,workspaceId:ticket.workspaceId,sourceType:"manual",senderName:"Assistente municipal",receivedAt:message.createdAt,rawContent,contentHash:hash(rawContent+message.id),detectedCaseId:record.id,classification:"municipal_changes",processingStatus:"completed",reviewStatus:"ready",requiresHumanReview:true,riskLevel:"medium",sourceExternalId:`municipal-outgoing:${message.id}`}})
+   await tx.inboxProcessingRun.upsert({where:{id:runId},update:{},create:{id:runId,inboxItemId:inboxId,model:"municipal-workflow",promptVersion:"approval-v1",extractorVersion:"1",processingVersion:"1",status:"completed",completedAt:now}})
+   await tx.proposedCaseChange.upsert({where:{id:proposalId},update:{},create:{id:proposalId,inboxItemId:inboxId,caseId:record.id,type:"TASK",processingRunId:runId,fingerprint:hash(message.id),confidence:1,riskLevel:"medium",sourceId:message.id,sourceType:"municipal_ticket",sourceExcerpt:message.content,payload:json({title,description:rawContent,municipalAction:"send_message",ticketId:ticket.id,messageId:message.id,formVersionId:message.formVersionId})}})
   }
   const approved=ticket.approvedVersionId?await tx.municipalFormVersion.findFirst({where:{id:ticket.approvedVersionId,ticketId}}):null
   const effective=approved||version,effectiveDefinition=effective?.definition as unknown as FormDefinition|undefined

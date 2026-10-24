@@ -49,7 +49,7 @@ export async function appendTicketInput(input:{workspaceId:string;ticketId:strin
 async function formMessage(tx:Prisma.TransactionClient,ticket:{id:string;workspaceId:string;connectorAccountId:string|null},version:MunicipalFormVersion,token:string,correction:boolean){
  const url=`${publicBase().replace(/\/$/,"")}/review/${version.id}#${token}`
  const code=version.id.slice(-8).toUpperCase()
- return tx.municipalTicketMessage.create({data:{workspaceId:ticket.workspaceId,ticketId:ticket.id,formVersionId:version.id,kind:"form",direction:"sent",author:"Sistema",content:`${correction?"Correções aplicadas":"Formulário gerado"} · versão ${version.number}\n${url}\n\nPara aceitar, responda ACEITAR ${code}. Para solicitar ajustes: AJUSTAR ${code}: descreva a alteração.`,metadata:json({reviewUrl:url,version:version.number,code}),deliveryStatus:ticket.connectorAccountId?"pending":"internal",externalKey:`form:${version.id}`}})
+ return tx.municipalTicketMessage.create({data:{workspaceId:ticket.workspaceId,ticketId:ticket.id,formVersionId:version.id,kind:"form",direction:"sent",author:"Sistema",content:`${correction?"Correções aplicadas":"Formulário gerado"} · versão ${version.number}\n${url}\n\nPara aceitar, responda ACEITAR ${code}. Para solicitar ajustes: AJUSTAR ${code}: descreva a alteração.`,metadata:json({reviewUrl:url,version:version.number,code}),deliveryStatus:"awaiting_approval",externalKey:`form:${version.id}`}})
 }
 async function createVersion(ticketId:string,key:string,actor:string,requestMessageId?:string,manualDefinition?:FormDefinition){
  const existing=await prisma.municipalFormVersion.findUnique({where:{operationKey:key}});if(existing){const message=await prisma.municipalTicketMessage.findFirst({where:{formVersionId:existing.id,direction:"sent",deliveryStatus:"pending"}});if(message)await enqueueTicket(ticketId,"deliver","workflow",message.id,message.id);return existing}
@@ -78,16 +78,18 @@ async function createVersion(ticketId:string,key:string,actor:string,requestMess
   await tx.municipalTicket.update({where:{id:ticket.id},data:{currentVersionId:version.id,status:version.status,...(isMunicipalCorrection?{clarificationRounds:{increment:1}}:{})}})
   await tx.municipalTicketMessage.create({data:{workspaceId:ticket.workspaceId,ticketId,formVersionId:version.id,kind:"event",direction:"system",author:"Sistema",content:manualDefinition?`Edição profissional · versão ${version.number}. Versão anterior preservada.`:request?`Correção automática · versão ${version.number}. Versão anterior preservada.`:`Formulário gerado · versão ${version.number}.`,metadata:json({changes,mode:resolved.mode})}})
   let message
-  if(blockers.length)message=await tx.municipalTicketMessage.create({data:{workspaceId:ticket.workspaceId,ticketId,formVersionId:version.id,kind:"clarification",direction:"sent",author:"Sistema",content:`Precisamos esclarecer antes de enviar o formulário v${version.number}:\n${blockers.map((b,i)=>`${i+1}. ${b}`).join("\n")}\nResponda pelo Ticket ou acesse: ${publicBase().replace(/\/$/,"")}/review/${version.id}#${token}`,deliveryStatus:ticket.connectorAccountId?"pending":"internal",externalKey:`clarification:${version.id}`}})
+  if(blockers.length)message=await tx.municipalTicketMessage.create({data:{workspaceId:ticket.workspaceId,ticketId,formVersionId:version.id,kind:"clarification",direction:"sent",author:"Sistema",content:`Precisamos esclarecer antes de enviar o formulário v${version.number}:\n${blockers.map((b,i)=>`${i+1}. ${b}`).join("\n")}\nResponda pelo Ticket ou acesse: ${publicBase().replace(/\/$/,"")}/review/${version.id}#${token}`,deliveryStatus:"awaiting_approval",externalKey:`clarification:${version.id}`}})
   else message=await formMessage(tx,ticket,version,token,isMunicipalCorrection)
   if(request)await tx.municipalTicketMessage.update({where:{id:request.id},data:{metadata:json({...requestMetadata,processed:true,resultVersionId:version.id})}})
   return{version,message}
  })
- await enqueueTicket(ticket.id,"deliver","workflow",result.message.id,result.message.id)
+ // Delivery is scheduled only after approval in the Ticket.
+ await syncMunicipalCase(ticket.id)
  return result.version
 }
 async function delivery(messageId:string,workspaceId:string){
  const message=await prisma.municipalTicketMessage.findFirst({where:{id:messageId,workspaceId},include:{ticket:true}});if(!message)throw new Error("Mensagem não encontrada.")
+ if(message.deliveryStatus==="awaiting_approval")return
  if(["sent","delivered","read"].includes(message.deliveryStatus))return
  if(message.deliveryStatus==="sending")throw new Error("O envio anterior não foi confirmado. Confira o conector antes de solicitar uma nova tentativa.")
  const account=message.ticket.connectorAccountId?await prisma.connectorAccount.findFirst({where:{id:message.ticket.connectorAccountId,workspaceId}}):null
@@ -186,7 +188,7 @@ async function processMessage(ticketId:string,messageId:string,key:string,actor:
  if(current&&current.status!=="needs_information"){
   await prisma.municipalTicketMessage.update({where:{id:message.id},data:{metadata:json({...metadata,processed:true,needsVersion:true})}})
   const response=await ticketEvent(ticketId,`A mensagem foi preservada. Para relacionar uma alteração à versão correta, responda AJUSTAR ${current.id.slice(-8).toUpperCase()}: descreva o ajuste, ou use o link do formulário.`,"clarification",current.id)
-  await prisma.municipalTicketMessage.update({where:{id:response.id},data:{direction:"sent",deliveryStatus:"pending"}});await enqueueTicket(ticketId,"deliver","workflow",response.id,response.id);return
+  await prisma.municipalTicketMessage.update({where:{id:response.id},data:{direction:"sent",deliveryStatus:"awaiting_approval"}});return
  }
  await informationVersion(ticketId,messageId,key,actor)
 }

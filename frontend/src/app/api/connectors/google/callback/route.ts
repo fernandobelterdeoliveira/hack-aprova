@@ -4,7 +4,7 @@ import { configureDriveWatch, configureGmailWatch, exchangeGoogleCode } from "@/
 import { prisma } from "@/lib/prisma"
 
 export async function GET(request: NextRequest) {
-  const settings = new URL("/communications", process.env.APP_BASE_URL || request.nextUrl.origin)
+  const settings = new URL("/settings", process.env.APP_BASE_URL || request.nextUrl.origin)
   settings.searchParams.set("section", "connectors")
   try {
     const code = request.nextUrl.searchParams.get("code")

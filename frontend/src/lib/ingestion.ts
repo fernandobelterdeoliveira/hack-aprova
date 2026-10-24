@@ -371,11 +371,13 @@ function textValue(value: Prisma.JsonValue | undefined, fallback = "") {
 
 export async function applyInboxItem(itemId: string, caseId: string, changeIds?: string[], decidedBy = "current-user") {
   return prisma.$transaction(async (transaction) => {
+    await transaction.$queryRaw`SELECT "id" FROM "InboxItem" WHERE "id" = ${itemId} FOR UPDATE`
     const item = await transaction.inboxItem.findUnique({
       where: { id: itemId },
       include: { proposedChanges: { where: { status: "pending" } } },
     })
     if (!item) throw new Error("Item da caixa de entrada não encontrado")
+    const outgoing: Array<{ticketId:string;messageId:string}> = []
 
     const selected = item.proposedChanges.filter((change) => !changeIds || changeIds.includes(change.id))
     const now = new Date()
@@ -397,7 +399,19 @@ export async function applyInboxItem(itemId: string, caseId: string, changeIds?:
         throw new Error(`Alteração ${change.id} bloqueada pela política: ${policy.reasons.join("; ")}`)
       }
       const deduplicationKey = contentFingerprint({ caseId, type: change.type, fingerprint: change.fingerprint })
-      if (change.type === "EVENT") {
+      const fresh=await transaction.proposedCaseChange.findUniqueOrThrow({where:{id:change.id}})
+      if(fresh.status!=="pending")continue
+      if(payload.municipalAction === "send_message") {
+        const target=await transaction.case.findUniqueOrThrow({where:{id:caseId}})
+        const message=await transaction.municipalTicketMessage.findFirst({where:{id:textValue(payload.messageId),ticketId:textValue(payload.ticketId),workspaceId:item.workspaceId,ticket:{processId:target.municipalProcessId||"unlinked"}}})
+        if(!message)throw new Error("A mensagem sugerida não pertence ao município selecionado.")
+        const ticket=await transaction.municipalTicket.findUniqueOrThrow({where:{id:message.ticketId}})
+        if(message.formVersionId&&message.formVersionId!==ticket.currentVersionId)throw new Error("Este formulário foi substituído. Revise a versão atual no Ticket.")
+        if(message.deliveryStatus==="awaiting_approval"){
+          await transaction.municipalTicketMessage.update({where:{id:message.id},data:{deliveryStatus:ticket.connectorAccountId?"pending":"internal",metadata:{...payloadRecord(message.metadata),approvedBy:decidedBy,approvedAt:now.toISOString()}}})
+        }
+        if(message.deliveryStatus==="awaiting_approval"||message.deliveryStatus==="pending")outgoing.push({ticketId:ticket.id,messageId:message.id})
+      } else if (change.type === "EVENT") {
         await transaction.caseEvent.upsert({ where: { deduplicationKey }, update: {}, create: {
           caseId,
           eventType: textValue(payload.eventType, "update"),
@@ -472,6 +486,6 @@ export async function applyInboxItem(itemId: string, caseId: string, changeIds?:
       data: { detectedCaseId: caseId, reviewStatus: "approved" },
     })
     await transaction.case.update({ where: { id: caseId }, data: { lastActivity: now } })
-    return { applied: selected.length, rejected: rejectedIds.length }
+    return { applied: selected.length, rejected: rejectedIds.length, outgoing }
   })
 }

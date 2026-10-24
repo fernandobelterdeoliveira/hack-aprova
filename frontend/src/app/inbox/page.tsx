@@ -1,9 +1,7 @@
 "use client"
 
-import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  AlertTriangle,
   ArrowLeft,
   Check,
   ChevronRight,
@@ -23,6 +21,7 @@ import {
   Upload,
   X,
 } from "lucide-react"
+import { SuggestedFormReview } from "@/components/suggested-form-review"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -220,7 +219,7 @@ export default function InboxPage() {
       if (action === "approve") {
         toast({
           title: "Alterações aprovadas",
-          description: `${data.applied ?? selectedChanges.length} ${Number(data.applied ?? selectedChanges.length) === 1 ? "item foi adicionado" : "itens foram adicionados"} ao caso.`,
+          description: data.sentToChat ? "Sugestão aprovada e disponibilizada no chat. O envio externo depende do conector configurado." : `${data.applied ?? selectedChanges.length} ${Number(data.applied ?? selectedChanges.length) === 1 ? "item foi adicionado" : "itens foram adicionados"} ao caso.`,
         })
       } else if (action === "reject") {
         toast({ title: "Sugestões descartadas", description: "Nenhuma alteração desta entrada foi adicionada ao caso." })
@@ -295,7 +294,7 @@ export default function InboxPage() {
                   </section>
 
                   <section>
-                    <div className="mb-3 flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-foreground">O que será registrado</h3><p className="mt-1 text-xs text-muted-foreground">Desmarque qualquer sugestão que não deva entrar no caso.</p></div><Badge variant="outline">{selectedChanges.length} selecionadas</Badge></div>
+                    <div className="mb-3 flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-foreground">O que será registrado</h3><p className="mt-1 text-xs text-muted-foreground">Selecione o que deseja aprovar. Envios aparecem no chat; dados ficam salvos no município.</p></div><Badge variant="outline">{selectedChanges.length} selecionadas</Badge></div>
                     <div className="space-y-3">
                       {[...selected.proposedChanges].sort((a, b) => changeOrder(a.type) - changeOrder(b.type)).map((change) => <ChangeCard key={change.id} change={change} selected={selectedChanges.includes(change.id)} disabled={change.status !== "pending"} onToggle={() => setSelectedChanges((current) => current.includes(change.id) ? current.filter((id) => id !== change.id) : [...current, change.id])} />)}
                     </div>
@@ -305,7 +304,7 @@ export default function InboxPage() {
                 <aside className="min-w-0 space-y-4">
                   {selected.processingStatus === "completed" && ["ready", "needs_association", "pending"].includes(selected.reviewStatus) ? <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
                     <p className="text-sm font-semibold text-foreground">Sua decisão</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Apenas os itens selecionados serão adicionados ao caso.</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">A aprovação executa somente as sugestões selecionadas.</p>
                     <div className="mt-4 space-y-2">
                       <Button className="action-primary w-full" onClick={() => review("approve")} disabled={working || !targetCaseId || selectedChanges.length === 0}>{working ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Aprovando...</> : <><ShieldCheck className="mr-2 h-4 w-4" />Aprovar selecionadas</>}</Button>
                       <Button variant="outline" className="w-full text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40" onClick={() => review("reject")} disabled={working}><X className="mr-2 h-4 w-4" />Descartar sugestões</Button>
@@ -316,19 +315,14 @@ export default function InboxPage() {
                   </section> : selected.processingStatus !== "completed" ? <section className="rounded-xl border border-border bg-card p-5"><p className="text-sm font-semibold text-foreground">Análise em andamento</p><p className="mt-1 text-xs leading-5 text-muted-foreground">As opções de aprovação serão liberadas quando o worker concluir o processamento.</p></section> : <section className="rounded-xl border border-border bg-card p-5"><p className="text-sm font-semibold text-foreground">Revisão concluída</p><p className="mt-1 text-xs text-muted-foreground">Esta entrada foi {selected.reviewStatus === "approved" ? "aprovada e registrada no caso" : "descartada"}.</p></section>}
 
                   <section className="rounded-xl border border-border bg-card p-5">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Município relacionado</p>
-                    {selected.detectedCase ? <div className="mt-3"><p className="text-sm font-semibold text-foreground">{selected.detectedCase.clientName}</p><p className="mt-1 text-xs text-muted-foreground">#{selected.detectedCase.caseNumber} · {selected.detectedCase.caseType}</p><div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-emerald-700"><Link href={`/cases/${selected.detectedCase.id}`}>Abrir município →</Link>{selected.detectedCase.municipalProcess?.ticket&&<Link href={`/communications?ticket=${selected.detectedCase.municipalProcess.ticket.id}`}>Abrir formulários →</Link>}</div><div className="mt-4"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confiança da associação</p><p className="mt-1 text-2xl font-semibold text-foreground">{selected.associationConfidence===null||selected.associationConfidence===undefined?"Vínculo manual":`${Math.round(selected.associationConfidence*100)}%`}</p></div></div> : <div className="mt-3 flex gap-2 text-sm text-amber-700 dark:text-amber-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />Escolha o caso correto antes de aprovar.</div>}
-                    <div className="mt-4 border-t border-border pt-4">
+                    <div>
                       <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Alterar município</Label>
                       <Select value={targetCaseId} onValueChange={setTargetCaseId}><SelectTrigger className="mt-2 h-9 w-full min-w-0 text-xs [&>span]:min-w-0 [&>span]:truncate"><SelectValue placeholder="Selecione município e processo" /></SelectTrigger><SelectContent>{cases.map((item) => <SelectItem key={item.id} value={item.id}>{item.clientName} · {item.caseType}</SelectItem>)}</SelectContent></Select>
-                      {targetCaseId && targetCaseId !== selected.detectedCase?.id && <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => review("reassign")} disabled={working}>Confirmar outro caso</Button>}
+                      {targetCaseId && targetCaseId !== selected.detectedCase?.id && <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => review("reassign")} disabled={working}>Confirmar município</Button>}
                     </div>
                   </section>
 
-                  <section className="rounded-xl border border-border bg-card p-5">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Por que este município</p>
-                    <div className="mt-3 space-y-2">{selected.associationSignals?.candidates?.[0]?.signals?.length ? selected.associationSignals.candidates[0].signals.map((signal, index) => <div key={index} className="flex items-start gap-2 text-xs leading-5 text-muted-foreground"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />{signal.detail}</div>) : <p className="text-xs leading-5 text-muted-foreground">Nenhum sinal forte foi encontrado. Confirme o caso manualmente.</p>}</div>
-                  </section>
+
                 </aside>
               </div>
             </div>
@@ -372,14 +366,14 @@ function ChangeCard({ change, selected, disabled, onToggle }: { change: Proposed
       : { className: "bg-emerald-500", label: "Informação validada" }
   return (
     <article className={`w-full rounded-xl border bg-card text-left transition ${selected ? "border-primary/50 bg-accent/35 ring-2 ring-primary/10" : "border-border"} ${disabled ? "opacity-60" : ""}`}>
-      <button type="button" onClick={onToggle} disabled={disabled} className="flex w-full items-start gap-3 p-4 text-left">
-        <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border text-transparent"}`}><Check className="h-3 w-3" /></span>
+      <div className="flex w-full items-start gap-3 p-4 text-left">
+        <input type="checkbox" aria-label={`Selecionar ${title}`} checked={selected} disabled={disabled} onChange={onToggle} className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-emerald-700" />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={`rounded-md text-xs ${typeStyle[change.type]}`}>{changeTypeLabel[change.type] || change.type}</Badge>{(change.riskLevel === "high" || change.riskLevel === "critical") && <Badge variant="destructive" className="text-xs">Revisão do advogado</Badge>}</div>
-          <p className="mt-2 text-sm font-semibold text-foreground">{title}</p>
-          {detail && <p className="mt-2 line-clamp-3 text-sm leading-5 text-muted-foreground">{detail}</p>}
+          <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={`rounded-md text-xs ${typeStyle[change.type]}`}>{changeTypeLabel[change.type] || change.type}</Badge>{(change.riskLevel === "high" || change.riskLevel === "critical") && <Badge variant="destructive" className="text-xs">Revisão profissional</Badge>}</div>
+          <p className="mt-2 text-sm font-semibold text-foreground">{title}</p><p className="mt-1 text-xs font-medium text-emerald-700">{payload.municipalAction === "send_message" ? "Ao aprovar: enviar no chat" : "Ao aprovar: salvar dados"}</p>
+          {detail && <p className="mt-2 line-clamp-3 text-sm leading-5 text-muted-foreground">{detail}</p>}{typeof payload.ticketId === "string" && typeof payload.formVersionId === "string" && <SuggestedFormReview ticketId={payload.ticketId} versionId={payload.formVersionId} />}
         </div>
-      </button>
+      </div>
       <div className="border-t border-border px-4 py-3 sm:ml-8">
         {sourceExcerpt && <div className="rounded-lg bg-muted px-3 py-2"><p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Fonte</p><p className="mt-1 line-clamp-2 text-xs italic leading-5 text-foreground">“{sourceExcerpt}”</p><p className="mt-1 text-[11px] text-muted-foreground">{change.sourceType || String(evidence?.source || "entrada atual")}{change.sourcePage ? ` · página ${change.sourcePage}` : ""}</p></div>}
         <div className="mt-3 flex justify-end"><span className={`h-3 w-3 rounded-full ${validationIndicator.className}`} title={validationIndicator.label} aria-label={validationIndicator.label} /></div>

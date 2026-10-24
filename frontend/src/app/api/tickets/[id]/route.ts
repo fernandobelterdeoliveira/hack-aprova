@@ -51,7 +51,7 @@ export async function POST(req:NextRequest,ctx:Context){
   }
   if(c.action==="minutes"||c.action==="round"){if(c.action==="minutes"&&!c.minutes)throw new Error("Informe os minutos.");await prisma.municipalTicket.update({where:{id},data:c.action==="minutes"?{minutesSpent:{increment:c.minutes!}}:{clarificationRounds:{increment:1}}});return NextResponse.json({saved:true})}
   if(c.action==="retry_delivery"){
-   const message=await prisma.municipalTicketMessage.findFirst({where:{id:c.messageId,ticketId:id,direction:"sent"}});if(!message||["sent","delivered","read","sending"].includes(message.deliveryStatus))throw new Error("Essa mensagem já foi enviada ou está em envio.")
+   const message=await prisma.municipalTicketMessage.findFirst({where:{id:c.messageId,ticketId:id,direction:"sent"}});if(!message||["sent","delivered","read","sending","awaiting_approval"].includes(message.deliveryStatus))throw new Error("Essa mensagem já foi enviada ou está em envio.")
    await prisma.backgroundJob.updateMany({where:{workspaceId:actor.workspaceId,type:TICKET_JOB,payload:{path:["messageId"],equals:message.id},status:{in:["failed","dead_letter"]}},data:{status:"cancelled",progressMessage:"Substituída por nova tentativa solicitada no Ticket"}});await prisma.municipalTicketMessage.update({where:{id:message.id},data:{deliveryStatus:"pending"}});const job=await enqueueTicket(id,"deliver",actor.userProfileId,c.requestKey||crypto.randomUUID(),message.id);return NextResponse.json({queued:true,jobId:job.id},{status:202})
   }
   if(c.action==="retry_job"){

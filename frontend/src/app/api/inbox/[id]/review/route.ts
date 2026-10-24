@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
+import { enqueueTicket } from "@/lib/municipal/tickets"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { applyInboxItem } from "@/lib/ingestion"
+import { sameOrigin } from "@/lib/request-origin"
 import { currentActor } from "@/lib/auth/current-actor"
 
 const reviewInput = z.object({
@@ -15,9 +17,11 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if(!sameOrigin(request))return NextResponse.json({error:"Origem inválida."},{status:403})
   try {
     const { id } = await params
     const actor = await currentActor()
+    if(!["owner","admin","member","professional","reviewer"].includes(actor.role))return NextResponse.json({error:"Sem permissão para revisar este Ticket."},{status:403})
     const parsed = reviewInput.safeParse(await request.json())
     if (!parsed.success) return NextResponse.json({ error: "Solicitação de revisão inválida" }, { status: 400 })
     const { action, caseId, changeIds, decidedBy } = parsed.data
@@ -63,7 +67,9 @@ export async function PATCH(
       return NextResponse.json({ reassigned: true })
     }
 
-    return NextResponse.json(await applyInboxItem(id, caseId, changeIds, decidedBy || actor.userProfileId))
+    const result=await applyInboxItem(id, caseId, changeIds, actor.userProfileId)
+    for(const message of result.outgoing)await enqueueTicket(message.ticketId,"deliver",actor.userProfileId,message.messageId,message.messageId)
+    return NextResponse.json({...result,sentToChat:result.outgoing.length})
   } catch (error) {
     console.error("Error reviewing inbox item:", error)
     return NextResponse.json(
