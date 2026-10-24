@@ -1,0 +1,753 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Local operator profile. The application currently runs in single-user mode;
+// this boundary can receive an auth provider account id when multi-user access
+// is introduced without coupling preferences to legal case data.
+model UserProfile {
+  id                    String             @id
+  authSubject           String?            @unique
+  name                  String
+  role                  String
+  email                 String?
+  bio                   String?            @db.Text
+  avatarUrl             String?
+  language              String             @default("pt-BR")
+  timezone              String             @default("America/Sao_Paulo")
+  theme                 String             @default("light")
+  accentColor           String             @default("emerald")
+  density               String             @default("comfortable")
+  emailNotifications    Boolean            @default(true)
+  deadlineNotifications Boolean            @default(true)
+  reviewNotifications   Boolean            @default(true)
+  weeklyDigest          Boolean            @default(false)
+  telemetryEnabled      Boolean            @default(false)
+  dataRetentionDays     Int                @default(365)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  memberships           WorkspaceMember[]
+  connectorAccounts     ConnectorAccount[]
+  mcpExecutions         MCPToolExecution[]
+}
+
+model Workspace {
+  id                String             @id @default(cuid())
+  name              String
+  slug              String             @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  members           WorkspaceMember[]
+  cases             Case[]
+  inboxItems        InboxItem[]
+  connectorAccounts ConnectorAccount[]
+  mcpExecutions     MCPToolExecution[]
+  backgroundJobs    BackgroundJob[]
+}
+
+model WorkspaceMember {
+  id            String      @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userProfileId String
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  role          String      @default("member")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([workspaceId, userProfileId])
+  @@index([userProfileId])
+}
+
+model Case {
+  id           String    @id @default(cuid())
+  workspaceId  String    @default("default-workspace")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  caseType     String
+  clientName   String
+  clientEmail  String?
+  clientDob    String?
+  clientPhone  String?
+  caseNumber   String    @unique
+  createdAt    DateTime  @default(now())
+  lastActivity DateTime  @default(now())
+  status       String    @default("open")
+  priority     String    @default("high")
+  assignedTo   String
+  description  String
+  nextAction   String
+
+  emails           Email[]
+  files            Files[]
+  chats            Chat[]
+  textMessages     TextMessage[]
+  phoneCalls       PhoneCall[]
+  reasonChains     ReasonChain[]
+  aiTasks          AITask[]
+  state            CaseState?
+  events           CaseEvent[]
+  facts            CaseFact[]
+  informationGaps  InformationGap[]
+  inboxItems       InboxItem[]
+  proposedChanges  ProposedCaseChange[]
+  aiExecutions     AIExecution[]
+  embeddings       EmbeddingRecord[]
+  outboundMessages OutboundMessage[]
+  dataChanges      CaseDataChange[]
+  backgroundJobs   BackgroundJob[]
+
+  @@index([workspaceId, lastActivity])
+}
+
+// Persistent operational snapshot. Agents update this state instead of only
+// returning a one-off response to the user.
+model CaseState {
+  id                 String    @id @default(cuid())
+  caseId             String    @unique
+  case               Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  stage              String
+  summary            String    @db.Text
+  summarySourceRefs  Json?
+  summaryWarnings    Json?
+  summaryGeneratedBy String?
+  summaryUpdatedAt   DateTime?
+  healthScore        Int?
+  version            Int       @default(1)
+  lastComputedAt     DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+// Normalized occurrence extracted from a document or communication.
+model CaseEvent {
+  id               String   @id @default(cuid())
+  caseId           String
+  case             Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  eventType        String
+  title            String
+  description      String?  @db.Text
+  occurredAt       DateTime
+  recordedAt       DateTime @default(now())
+  sourceType       String
+  sourceId         String?
+  confidence       Float?
+  metadata         Json?
+  deduplicationKey String?  @unique
+
+  @@index([caseId, occurredAt])
+}
+
+// Atomic fact with enough provenance for a reviewer to find the source.
+model CaseFact {
+  id               String    @id @default(cuid())
+  caseId           String
+  case             Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  fieldName        String
+  value            Json
+  sourceType       String
+  sourceId         String?
+  sourcePage       Int?
+  sourceExcerpt    String?   @db.Text
+  confidence       Float?
+  extractedAt      DateTime  @default(now())
+  verifiedAt       DateTime?
+  verifiedBy       String?
+  archivedAt       DateTime?
+  archivedBy       String?
+  lastEditedAt     DateTime?
+  lastEditedBy     String?
+  deduplicationKey String?   @unique
+
+  @@index([caseId, fieldName])
+  @@index([caseId, archivedAt])
+}
+
+model CaseDataChange {
+  id            String   @id @default(cuid())
+  caseId        String
+  case          Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  entityType    String
+  entityId      String
+  fieldName     String
+  action        String
+  previousValue Json?
+  newValue      Json?
+  changedBy     String
+  createdAt     DateTime @default(now())
+
+  @@index([caseId, createdAt])
+  @@index([entityType, entityId])
+}
+
+// Explicit unknowns that can generate a follow-up question or a task.
+model InformationGap {
+  id                String    @id @default(cuid())
+  caseId            String
+  case              Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?   @db.Text
+  priority          String    @default("medium")
+  status            String    @default("open")
+  suggestedQuestion String?   @db.Text
+  sourceEventId     String?
+  createdAt         DateTime  @default(now())
+  resolvedAt        DateTime?
+  deduplicationKey  String?   @unique
+
+  @@index([caseId, status])
+}
+
+// Raw, immutable entry received before it becomes part of an official case.
+model InboxItem {
+  id                    String               @id @default(cuid())
+  workspaceId           String               @default("default-workspace")
+  workspace             Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceType            String
+  sourceExternalId      String?
+  senderName            String?
+  senderEmail           String?
+  senderPhone           String?
+  receivedAt            DateTime
+  rawContent            String               @db.Text
+  contentHash           String
+  semanticFingerprint   String?
+  fileName              String?
+  fileType              String?
+  fileUrl               String?
+  detectedCaseId        String?
+  detectedCase          Case?                @relation(fields: [detectedCaseId], references: [id], onDelete: SetNull)
+  associationConfidence Float?
+  associationSignals    Json?
+  classification        String?
+  riskLevel             String?
+  requiresDeepReasoning Boolean              @default(false)
+  requiresHumanReview   Boolean              @default(true)
+  decisionProvider      String?
+  processingStatus      String               @default("pending")
+  reviewStatus          String               @default("pending")
+  errorMessage          String?              @db.Text
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  proposedChanges       ProposedCaseChange[]
+  processingRuns        InboxProcessingRun[]
+  aiExecutions          AIExecution[]
+  embeddings            EmbeddingRecord[]
+  connectorDelivery     ConnectorDelivery?
+  storedObjects         StoredObject[]
+  outboundMessages      OutboundMessage[]
+  backgroundJobs        BackgroundJob[]
+
+  @@unique([workspaceId, sourceType, sourceExternalId])
+  @@unique([workspaceId, sourceType, contentHash])
+  @@index([reviewStatus, receivedAt])
+  @@index([detectedCaseId])
+  @@index([workspaceId, receivedAt])
+}
+
+// Durable PostgreSQL-backed queue. Workers claim jobs with SKIP LOCKED so
+// multiple worker processes can run safely without processing the same job.
+model BackgroundJob {
+  id                String     @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type              String
+  status            String     @default("queued")
+  payload           Json
+  result            Json?
+  priority          Int        @default(0)
+  progress          Int        @default(0)
+  progressMessage   String?
+  attempts          Int        @default(0)
+  maxAttempts       Int        @default(3)
+  timeoutMs         Int        @default(300000)
+  availableAt       DateTime   @default(now())
+  lockedAt          DateTime?
+  lockedBy          String?
+  cancelRequestedAt DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  lastError         String?    @db.Text
+  deadLetteredAt    DateTime?
+  deduplicationKey  String?    @unique
+  createdBy         String
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  caseId            String?
+  case              Case?      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  inboxItemId       String?
+  inboxItem         InboxItem? @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt, priority])
+  @@index([workspaceId, status, createdAt])
+  @@index([inboxItemId, createdAt])
+  @@index([caseId, createdAt])
+}
+
+// External accounts are deliberately separate from InboxItem. Credentials are
+// encrypted by the application before persistence and never returned by APIs.
+model ConnectorAccount {
+  id                    String              @id @default(cuid())
+  workspaceId           String              @default("default-workspace")
+  workspace             Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userProfileId         String?
+  userProfile           UserProfile?        @relation(fields: [userProfileId], references: [id], onDelete: SetNull)
+  provider              String
+  externalAccountId     String
+  displayName           String?
+  email                 String?
+  status                String              @default("connected")
+  encryptedCredentials  String?             @db.Text
+  config                Json?
+  cursor                String?
+  tokenExpiresAt        DateTime?
+  subscriptionExpiresAt DateTime?
+  lastSyncedAt          DateTime?
+  errorMessage          String?             @db.Text
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  deliveries            ConnectorDelivery[]
+  storedObjects         StoredObject[]
+  outboundMessages      OutboundMessage[]
+
+  @@unique([provider, externalAccountId])
+  @@index([provider, status])
+  @@index([workspaceId, provider, status])
+}
+
+model MCPToolExecution {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userProfileId String?
+  userProfile   UserProfile? @relation(fields: [userProfileId], references: [id], onDelete: SetNull)
+  toolName      String
+  requiredScope String
+  inputHash     String
+  status        String
+  latencyMs     Int
+  error         String?      @db.Text
+  createdAt     DateTime     @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([userProfileId, createdAt])
+  @@index([toolName, createdAt])
+}
+
+// Immutable delivery envelope used for webhook idempotency and diagnostics.
+model ConnectorDelivery {
+  id                String            @id @default(cuid())
+  provider          String
+  externalId        String
+  accountId         String?
+  account           ConnectorAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  inboxItemId       String?           @unique
+  inboxItem         InboxItem?        @relation(fields: [inboxItemId], references: [id], onDelete: SetNull)
+  payload           Json
+  signatureVerified Boolean           @default(false)
+  status            String            @default("received")
+  errorMessage      String?           @db.Text
+  receivedAt        DateTime          @default(now())
+  processedAt       DateTime?
+  storedObjects     StoredObject[]
+
+  @@unique([provider, externalId])
+  @@index([accountId, receivedAt])
+  @@index([status, receivedAt])
+}
+
+// Durable private copy of media and attachments received through connectors.
+// The storage key is internal; access is exposed only through signed URLs.
+model StoredObject {
+  id                  String             @id @default(cuid())
+  storageProvider     String
+  storageKey          String             @unique
+  originalName        String
+  mimeType            String
+  sizeBytes           Int
+  sha256              String
+  sourceProvider      String
+  sourceExternalId    String?
+  inboxItemId         String?
+  inboxItem           InboxItem?         @relation(fields: [inboxItemId], references: [id], onDelete: SetNull)
+  connectorAccountId  String?
+  connectorAccount    ConnectorAccount?  @relation(fields: [connectorAccountId], references: [id], onDelete: SetNull)
+  connectorDeliveryId String?
+  connectorDelivery   ConnectorDelivery? @relation(fields: [connectorDeliveryId], references: [id], onDelete: SetNull)
+  metadata            Json?
+  createdAt           DateTime           @default(now())
+
+  @@index([inboxItemId])
+  @@index([connectorDeliveryId])
+  @@index([sha256])
+}
+
+// Auditable outbound queue. Only a deterministic, low-risk receipt may be
+// sent automatically and only when the global opt-in is enabled.
+model OutboundMessage {
+  id                 String           @id @default(cuid())
+  channel            String
+  connectorAccountId String
+  connectorAccount   ConnectorAccount @relation(fields: [connectorAccountId], references: [id], onDelete: Restrict)
+  caseId             String?
+  case               Case?            @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  inboxItemId        String?
+  inboxItem          InboxItem?       @relation(fields: [inboxItemId], references: [id], onDelete: SetNull)
+  recipient          String
+  subject            String?
+  content            String           @db.Text
+  riskLevel          String           @default("low")
+  messageKind        String
+  status             String           @default("pending_review")
+  idempotencyKey     String           @unique
+  approvedBy         String?
+  approvedAt         DateTime?
+  sentAt             DateTime?
+  externalId         String?
+  errorMessage       String?          @db.Text
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([status, createdAt])
+  @@index([connectorAccountId, createdAt])
+  @@index([caseId, createdAt])
+}
+
+// Staging record that separates AI understanding from official case data.
+model ProposedCaseChange {
+  id               String             @id @default(cuid())
+  inboxItemId      String
+  inboxItem        InboxItem          @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+  caseId           String?
+  case             Case?              @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  type             String
+  payload          Json
+  fingerprint      String
+  processingRunId  String
+  processingRun    InboxProcessingRun @relation(fields: [processingRunId], references: [id], onDelete: Cascade)
+  confidence       Float
+  riskLevel        String             @default("medium")
+  requiresReview   Boolean            @default(true)
+  sourceId         String?
+  sourceType       String?
+  documentId       String?
+  sourcePage       Int?
+  sourceExcerpt    String?            @db.Text
+  provider         String?
+  model            String?
+  modelVersion     String?
+  promptVersion    String?
+  extractorVersion String?
+  policyDecision   String?
+  aiExecutionId    String?
+  aiExecution      AIExecution?       @relation(fields: [aiExecutionId], references: [id], onDelete: SetNull)
+  status           String             @default("pending")
+  decidedBy        String?
+  decidedAt        DateTime?
+  appliedAt        DateTime?
+  createdAt        DateTime           @default(now())
+
+  @@unique([processingRunId, fingerprint])
+  @@index([inboxItemId, status])
+  @@index([caseId, status])
+  @@index([aiExecutionId])
+}
+
+model InboxProcessingRun {
+  id                String               @id @default(cuid())
+  inboxItemId       String
+  inboxItem         InboxItem            @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+  model             String
+  promptVersion     String
+  extractorVersion  String
+  processingVersion String
+  status            String               @default("processing")
+  output            Json?
+  errorMessage      String?              @db.Text
+  startedAt         DateTime             @default(now())
+  completedAt       DateTime?
+  proposedChanges   ProposedCaseChange[]
+
+  @@index([inboxItemId, startedAt])
+}
+
+// Common audit envelope for deterministic decisions and external AI calls.
+// It stores structured inputs/outputs, not hidden chain-of-thought.
+model AIExecution {
+  id              String               @id @default(cuid())
+  provider        String
+  model           String
+  modelVersion    String?
+  promptVersion   String?
+  workflowVersion String
+  inputHash       String
+  outputHash      String?
+  input           Json?
+  output          Json?
+  latencyMs       Int?
+  tokenUsage      Json?
+  estimatedCost   Decimal?             @db.Decimal(12, 8)
+  status          String               @default("started")
+  error           String?              @db.Text
+  startedAt       DateTime             @default(now())
+  completedAt     DateTime?
+  caseId          String?
+  case            Case?                @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  inboxItemId     String?
+  inboxItem       InboxItem?           @relation(fields: [inboxItemId], references: [id], onDelete: SetNull)
+  proposedChanges ProposedCaseChange[]
+
+  @@index([inboxItemId, startedAt])
+  @@index([caseId, startedAt])
+  @@index([provider, model, startedAt])
+}
+
+// JSON keeps the baseline compatible with stock PostgreSQL. A pgvector
+// migration can replace this representation after the extension is verified.
+model EmbeddingRecord {
+  id             String     @id @default(cuid())
+  entityType     String
+  entityId       String
+  contentHash    String
+  contentPreview String?    @db.Text
+  provider       String
+  model          String
+  modelVersion   String?
+  dimensions     Int
+  vector         Json
+  caseId         String?
+  case           Case?      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  inboxItemId    String?
+  inboxItem      InboxItem? @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([entityType, entityId, provider, model, contentHash])
+  @@index([caseId, entityType])
+  @@index([inboxItemId])
+}
+
+model Chat {
+  id       String    @id @default(cuid())
+  caseId   String
+  case     Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  messages Message[]
+}
+
+model Message {
+  id     String @id @default(cuid())
+  role   String
+  text   String
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+}
+
+model Email {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  from      String
+  to        String
+  subject   String
+  content   String
+}
+
+model Files {
+  id         String   @id @default(cuid())
+  caseId     String
+  case       Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  uploadedAt DateTime @default(now())
+  uploadedBy String
+  name       String
+  url        String
+  type       String
+  size       String
+}
+
+model TextMessage {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  text      String
+  from      String
+  to        String
+}
+
+model PhoneCall {
+  id               String   @id @default(cuid())
+  caseId           String
+  case             Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  phoneNumber      String
+  message          String   @db.Text
+  callSid          String?
+  status           String   @default("initiated") // initiated, completed, failed, no-answer
+  duration         Int? // duration in seconds
+  statusBeforeCall String? // case status before the call
+  statusAfterCall  String? // case status after the call
+}
+
+// Transparent Reason Chain for explainability
+model ReasonChain {
+  id         String   @id @default(cuid())
+  caseId     String
+  case       Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  agentType  String // records_wrangler, client_communication, etc.
+  action     String
+  reasoning  String   @db.Text
+  status     String   @default("pending") // pending, approved, rejected
+  impact     String   @default("medium") // low, medium, high
+  data       Json? // Additional data as JSON
+  confidence Float?
+  timestamp  DateTime @default(now())
+}
+
+// AI-generated actionable tasks
+model AITask {
+  id               String    @id @default(cuid())
+  caseId           String
+  case             Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title            String
+  description      String    @db.Text
+  priority         String // high, medium, low
+  category         String // document, communication, research, deadline, follow-up
+  status           String    @default("pending") // pending, in-progress, completed, dismissed
+  estimatedTime    String?
+  dueDate          DateTime?
+  completedAt      DateTime?
+  createdBy        String // AI agent that created it
+  reasoning        String?   @db.Text // Why this task was recommended
+  relatedTo        String? // Related reasonChainId or analysisId
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deduplicationKey String?   @unique
+}
+
+
+// Municipal implementation dossiers, isolated from existing legal cases.
+model MunicipalProcess {
+  id String @id @default(cuid())
+  workspaceId String
+  municipality String
+  department String
+  name String
+  templateKey String
+  owner String
+  contactPhone String?
+  contactEmail String?
+  ticket MunicipalTicket?
+  status String @default("collecting")
+  targetDate DateTime?
+  rules Json @default("[]")
+  sources Json @default("[]")
+  scenarios Json @default("[]")
+  history Json @default("[]")
+  minutesSpent Int @default(0)
+  clarificationRounds Int @default(0)
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([workspaceId, municipality, department])
+}
+
+model WhatsAppChatMessage {
+  id String @id @default(cuid())
+  workspaceId String
+  accountId String
+  phone String
+  contactName String?
+  direction String
+  content String @db.Text
+  providerId String? @unique
+  requestKey String? @unique
+  status String @default("received")
+  errorMessage String?
+  attachments Json @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([workspaceId, phone, createdAt])
+  @@index([accountId, createdAt])
+}
+
+
+model MunicipalTicket {
+ id String @id @default(cuid())
+ workspaceId String
+ processId String @unique
+ process MunicipalProcess @relation(fields:[processId],references:[id],onDelete:Cascade)
+ status String @default("information_received")
+ revision Int @default(1)
+ currentVersionId String?
+ approvedVersionId String?
+ connectorAccountId String?
+ recipient String?
+ minutesSpent Int @default(0)
+ clarificationRounds Int @default(0)
+ baselineMinutes Int?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ versions MunicipalFormVersion[]
+ messages MunicipalTicketMessage[]
+ @@index([workspaceId,updatedAt])
+}
+
+model MunicipalFormVersion {
+ id String @id @default(cuid())
+ ticketId String
+ ticket MunicipalTicket @relation(fields:[ticketId],references:[id],onDelete:Cascade)
+ number Int
+ status String @default("draft")
+ definition Json
+ contextSnapshot Json
+ changeSet Json @default("[]")
+ blockers Json @default("[]")
+ generatedBy String
+ operationKey String @unique
+ requestMessageId String?
+ previousVersionId String?
+ municipalityDecision String?
+ reviewedBy String?
+ reviewedAt DateTime?
+ approvedBy String?
+ approvedAt DateTime?
+ testResults Json @default("{}")
+ reviewTokenHash String? @unique
+ reviewExpiresAt DateTime?
+ createdAt DateTime @default(now())
+ messages MunicipalTicketMessage[]
+ @@unique([ticketId,number])
+}
+
+model MunicipalTicketMessage {
+ id String @id @default(cuid())
+ workspaceId String
+ ticketId String
+ ticket MunicipalTicket @relation(fields:[ticketId],references:[id],onDelete:Cascade)
+ formVersionId String?
+ formVersion MunicipalFormVersion? @relation(fields:[formVersionId],references:[id],onDelete:SetNull)
+ kind String @default("text")
+ direction String
+ content String @db.Text
+ author String
+ channel String @default("internal")
+ externalKey String? @unique
+ originalContent String? @db.Text
+ inboxItemId String?
+ whatsappMessageId String?
+ storageId String?
+ metadata Json @default("{}")
+ deliveryStatus String @default("internal")
+ externalId String?
+ errorMessage String?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ @@index([workspaceId,ticketId,createdAt])
+}

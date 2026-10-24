@@ -1,0 +1,77 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/frontend/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/frontend/.next/
+/frontend/out/
+
+# production
+/frontend/build
+
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+AI/.env
+
+.venv/
+
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+/frontend/src/generated/prisma
+
+.env
+# Local runtime, backups and connection credentials
+backups/
+artifacts/
+*-run.log
+*-error.log
+.env.local
+
+# Local data, private attachments, generated reports and IDE caches
+**/node_modules/
+**/__pycache__/
+**/.pytest_cache/
+**/.idea/
+**/.venv/
+*.py[cod]
+*.log
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+/frontend/data/
+/AI/data/
+/frontend/file_urls.txt
+/ticket-backup-path.txt
