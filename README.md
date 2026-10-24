@@ -1,6 +1,6 @@
 <div align="center">
 
-# Hack Aprova
+# Lexi
 
 ### Da conversa com a prefeitura ao formulário validado.
 
@@ -25,7 +25,7 @@ Com várias prefeituras em implantação, depender de reuniões e correções ma
 
 ## A solução
 
-O **Hack Aprova** reúne informações por **prefeitura → secretaria ou setor → processo → regras**. A IA ajuda a identificar lacunas, organizar respostas e propor formulários e correções. O implantador revisa as sugestões, decide o que deve ser enviado e realiza a aprovação profissional final.
+O **Lexi** reúne informações por **prefeitura → secretaria ou setor → processo → regras**. A IA ajuda a identificar lacunas, organizar respostas e propor formulários e correções. O implantador revisa as sugestões, decide o que deve ser enviado e realiza a aprovação profissional final.
 
 | Onde o trabalho trava | Como o MVP ajuda |
 | --- | --- |

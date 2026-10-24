@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
 export const metadata: Metadata = {
-    title: "LexiLoop | Regras e implantação",
+    title: "Lexi",
     description: "Coleta de evidências, comunicação e validação de regras de processos",
 }
 

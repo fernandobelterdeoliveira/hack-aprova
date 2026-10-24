@@ -20,8 +20,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Command className="h-5 w-5" strokeWidth={2.4} />
           </span>
           <span>
-            <span className="block text-[15px] font-semibold tracking-tight">LexiLoop</span>
-            <span className="block text-[10px] font-medium uppercase tracking-[0.16em] text-white/45">Operações e implantação</span>
+            <span className="block text-[15px] font-semibold tracking-tight">Lexi</span>
           </span>
         </Link>
 
@@ -45,7 +44,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild><button aria-label="Abrir navegação" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"><Menu className="h-5 w-5" /></button></SheetTrigger>
             <SheetContent side="left" className="w-[286px] border-0 bg-[#0e0f12] p-0 text-white">
-              <SheetHeader className="border-b border-white/10 px-5 py-5 text-left"><SheetTitle className="flex items-center gap-3 text-white"><span className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-white"><Command className="h-5 w-5" /></span>LexiLoop</SheetTitle><SheetDescription className="text-white/45">Coleta e validação de regras</SheetDescription></SheetHeader>
+              <SheetHeader className="border-b border-white/10 px-5 py-5 text-left"><SheetTitle className="flex items-center gap-3 text-white"><span className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-white"><Command className="h-5 w-5" /></span>Lexi</SheetTitle><SheetDescription className="text-white/45">Coleta e validação de regras</SheetDescription></SheetHeader>
               <div className="px-4 pt-4"><Link href="/municipal?new=1" onClick={() => setMobileMenuOpen(false)} className="flex h-10 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" />Novo processo</Link></div>
               <div className="pt-5"><DashboardNav onNavigate={() => setMobileMenuOpen(false)} /></div>
             </SheetContent>
