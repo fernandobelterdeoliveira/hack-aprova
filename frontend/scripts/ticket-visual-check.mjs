@@ -26,7 +26,7 @@ try{
  await page("municipality-review.png",1200,1050,links.municipality,'Boolean(document.querySelector("#form-field-tipo_pessoa")) && document.body.innerText.includes("Análise da prefeitura")')
  await page("municipal-showcase.png",1440,1050,"http://127.0.0.1:3001/municipal",'document.body?.innerText.includes("Prefeitura de Serra Clara") && document.body?.innerText.includes("Prefeitura de Santa Aurora")')
  await page("municipios.png",1440,1050,"http://127.0.0.1:3001/cases",'document.querySelector("h1")?.textContent === "Municípios" && document.body.innerText.includes("TESTAR · Alvará")')
- await page("municipio-detalhe.png",1440,1050,"http://127.0.0.1:3001/cases/municipal-case-validacao-referencia",'document.body?.innerText.includes("Exceção solicitada para revisão")')
+ await page("municipio-detalhe.png",1440,1050,"http://127.0.0.1:3001/cases/municipal-case-validacao-referencia#regras",'document.body?.innerText.includes("Exceção solicitada para revisão")')
  await page("inbox-municipal.png",1440,1050,"http://127.0.0.1:3001/inbox",'document.body?.innerText.includes("Prefeitura de")')
  assert.deepEqual(errors,[]);console.log("PASS: desktop/mobile chat layout, no Other Channels, public review, fillable modal and person-type conditional fields. No messages or approvals submitted.")
 }finally{await call("Browser.close").catch(()=>{});socket.close()}

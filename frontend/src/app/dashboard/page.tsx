@@ -5,12 +5,9 @@ import { useEffect, useState } from "react"
 import {
   ArrowRight,
   CalendarClock,
-  Check,
   ChevronRight,
   CircleAlert,
-  Clock3,
   FileStack,
-  Inbox,
   Loader2,
   MessageSquareText,
   ShieldCheck,
@@ -106,7 +103,7 @@ export default function DashboardPage() {
           <p className="mt-2 text-sm text-slate-500">{today} · Veja o que precisa de atenção nos processos municipais.</p>
         </div>
         <Button asChild className="action-primary h-10 rounded-lg px-4">
-          <Link href="/actions">Abrir fila de revisão <ArrowRight className="ml-2 h-4 w-4" /></Link>
+          <Link href="/inbox">Abrir fila <ArrowRight className="ml-2 h-4 w-4" /></Link>
         </Button>
       </section>
 
@@ -172,11 +169,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-3">
-        <FocusCard icon={Inbox} title="Entradas sem associação" value="4" detail="Itens precisam ser vinculados a cliente e caso" link="Revisar entradas" href="/inbox?filter=needs_association" />
-        <FocusCard icon={Clock3} title="Aguardando clientes" value="7" detail="Solicitações de informação sem resposta" link="Ver acompanhamentos" href="/communications" />
-        <FocusCard icon={Check} title="Concluídas nesta semana" value="18" detail="Tarefas encerradas pelo escritório" link="Ver atividade" href="/actions?tab=approved" />
-      </section>
+
     </div>
   )
 }
@@ -191,15 +184,6 @@ function Metric({ icon: Icon, label, value, note, accent = false }: { icon: type
   )
 }
 
-function FocusCard({ icon: Icon, title, value, detail, link, href }: { icon: typeof Inbox; title: string; value: string; detail: string; link: string; href: string }) {
-  return (
-    <Link href={href} className="surface-card group flex items-center gap-4 p-5 transition hover:-translate-y-0.5 hover:border-[#c8ced8] hover:shadow-[0_8px_24px_rgba(24,32,51,.08)]">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#edf1ff] text-[#3157d5]"><Icon className="h-[18px] w-[18px]" /></div>
-      <div className="min-w-0 flex-1"><p className="text-xs font-semibold text-slate-800">{title}</p><p className="mt-1 truncate text-[11px] text-slate-400">{detail}</p></div>
-      <div className="text-right"><p className="text-xl font-semibold text-slate-900">{value}</p><p className="mt-1 text-[11px] font-medium text-[#3157d5] group-hover:underline">{link}</p></div>
-    </Link>
-  )
-}
 
 function Empty({ label }: { label: string }) {
   return <div className="grid min-h-[220px] place-items-center text-sm text-slate-400">{label}</div>

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import {MunicipalRulesPanel} from "@/components/municipal-rules-panel"
 import {
   AlertTriangle, ArrowLeft, ArrowRight, BookOpenCheck, CheckCircle2, ChevronDown,
   CircleAlert, FileSearch, FileText, FolderOpen, History, Loader2, RefreshCw, Search,
@@ -50,6 +51,9 @@ const statusLabel: Record<string, string> = { open: "Aberto", active: "Ativo", p
 const riskLabel: Record<string, string> = { low: "Baixo", medium: "Médio", high: "Alto", critical: "Crítico", urgent: "Urgente" }
 const factLabel: Record<string, string> = { confirmed: "Confirmado", alleged: "Alegação", contradictory: "Contraditório", pending: "Não verificado" }
 
+const caseTabs=[["resumo","Resumo"],["dados","Dados"],["timeline","Timeline"],["fatos","Fatos"],["atencao","Atenção"],["lacunas","Lacunas"],["documentos","Documentos"],["tarefas","Tarefas"],["fontes","Fontes"],["inteligencia","Inteligência"],["regras","Regras"]] as const
+type CaseTab=typeof caseTabs[number][0]
+const SectionVisibilityContext=React.createContext<CaseTab|null>(null)
 export default function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params)
   const [data, setData] = useState<OperationalCase | null>(null)
@@ -73,6 +77,12 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   const [taskSaving, setTaskSaving] = useState(false)
   const [taskError, setTaskError] = useState<string | null>(null)
   const [timelineExpanded, setTimelineExpanded] = useState(false)
+  const [activeTab,setActiveTab]=useState<CaseTab>("resumo")
+  useEffect(()=>{const read=()=>{const hash=window.location.hash.slice(1);setActiveTab(caseTabs.some(([id])=>id===hash)?hash as CaseTab:"resumo")};read();window.addEventListener("hashchange",read);return()=>window.removeEventListener("hashchange",read)},[id])
+  useEffect(()=>{document.getElementById(`tab-${activeTab}`)?.scrollIntoView({block:"nearest",inline:"nearest"})},[activeTab,loading])
+  function selectTab(tab:CaseTab){setActiveTab(tab);window.history.replaceState(null,"",`${window.location.pathname}${window.location.search}#${tab}`)}
+  function sectionLink(event:React.MouseEvent){const target=event.target instanceof Element?event.target.closest('a[href^="#"]'):null,id=target?.getAttribute("href")?.slice(1);if(id&&caseTabs.some(([tab])=>tab===id)){event.preventDefault();selectTab(id as CaseTab)}}
+
 
   const fetchCase = useCallback(async () => {
     try {
@@ -207,7 +217,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   if (!data) return null
 
   return (
-    <div className="mx-auto max-w-[1500px] space-y-8 pb-12">
+    <div className="mx-auto max-w-[1500px] space-y-8 pb-12" onClick={sectionLink}>
       <header className="border-b border-border pb-6">
         <Link href="/cases" className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />Todos os municípios</Link>
         <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-start">
@@ -227,12 +237,12 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       </header>
 
-      <nav className="scrollbar-hidden sticky top-2 z-20 flex gap-1 overflow-x-auto rounded-xl border border-border bg-background/95 p-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
-        {[['resumo','Resumo'],['dados','Dados'],['timeline','Timeline'],['fatos','Fatos'],['atencao','Atenção'],['lacunas','Lacunas'],['documentos','Documentos'],['tarefas','Tarefas'],['fontes','Fontes'],['inteligencia','Inteligência']].map(([anchor,label]) => <a key={anchor} href={`#${anchor}`} className="whitespace-nowrap rounded-lg px-3 py-2 transition-colors hover:bg-secondary hover:text-foreground">{label}</a>)}
+      <nav aria-label="Seções do município" role="tablist" className="scrollbar-hidden sticky top-2 z-20 flex gap-1 overflow-x-auto rounded-xl border border-border bg-background/95 p-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur" onKeyDown={event=>{if(!["ArrowRight","ArrowLeft","Home","End"].includes(event.key))return;event.preventDefault();const index=caseTabs.findIndex(([id])=>id===activeTab),next=event.key==="Home"?0:event.key==="End"?caseTabs.length-1:(index+(event.key==="ArrowRight"?1:-1)+caseTabs.length)%caseTabs.length,tab=caseTabs[next][0];selectTab(tab);document.getElementById(`tab-${tab}`)?.focus()}}>
+        {caseTabs.map(([tab,label])=><button key={tab} type="button" role="tab" id={`tab-${tab}`} aria-selected={activeTab===tab} aria-controls="municipal-panel" tabIndex={activeTab===tab?0:-1} onClick={()=>selectTab(tab)} className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${activeTab===tab?"bg-accent font-semibold text-primary":"hover:bg-secondary hover:text-foreground"}`}>{label}</button>)}
       </nav>
 
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <main className="min-w-0 space-y-5">
+      <SectionVisibilityContext.Provider value={activeTab}><div className={`grid gap-8 ${activeTab==="resumo"?"xl:grid-cols-[minmax(0,1fr)_360px]":""}`}>
+        <main id="municipal-panel" role="tabpanel" aria-labelledby={`tab-${activeTab}`} tabIndex={0} className="min-w-0 space-y-5 focus-visible:outline-2 focus-visible:outline-primary">
           <Section id="resumo" eyebrow="Entendimento rápido" title="Resumo executivo" icon={BookOpenCheck} action={<Button variant="outline" size="sm" onClick={regenerateSummary} disabled={regenerating}>{regenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Regerar resumo</Button>}>
             <p className="max-w-4xl text-[15px] leading-7 text-foreground/85">{data.summary.text}</p>
             {data.summary.warnings.map((warning) => <div key={warning} className="mt-4 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950"><AlertTriangle className="h-4 w-4 shrink-0" />{warning}</div>)}
@@ -259,11 +269,11 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             {data.risks.length ? <div className="space-y-3">{data.risks.map((risk) => <div key={risk.id} className="rounded-lg border border-border p-4"><div className="flex flex-wrap items-center gap-2"><RiskBadge value={risk.level} /><p className="font-medium">{risk.title}</p></div><p className="mt-2 text-sm leading-6 text-muted-foreground">{risk.reason}</p>{risk.source && <div className="mt-3"><SourceChip source={risk.source} /></div>}</div>)}</div> : <Empty text="Nenhum ponto crítico foi identificado nos registros atuais." />}
           </Section>
 
-          {data.impacts.length > 0 && <Section eyebrow="Perspectiva do cliente" title="Como o cliente foi afetado" icon={UsersRound}>
+          {data.impacts.length > 0 && <Section tab="atencao" eyebrow="Perspectiva do cliente" title="Como o cliente foi afetado" icon={UsersRound}>
             <div className="divide-y divide-border">{data.impacts.map((impact) => <div key={impact.id} className="py-4 first:pt-0"><div className="flex gap-2"><Badge variant="outline">{impact.kind === "confirmed" ? "Informação confirmada" : "Relato do cliente"}</Badge></div><p className="mt-2 text-sm">{impact.value}</p><div className="mt-3"><SourceChip source={impact.source} /></div></div>)}</div>
           </Section>}
 
-          <Section eyebrow="Fontes divergentes" title="Contradições" icon={AlertTriangle}>
+          <Section tab="atencao" eyebrow="Fontes divergentes" title="Contradições" icon={AlertTriangle}>
             {data.contradictions.length ? <div className="space-y-4">{data.contradictions.map((item) => <div key={item.id} className="rounded-lg border border-rose-200 bg-rose-50/40 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold">{item.title}</p><Badge variant="outline">Revisar</Badge></div><div className="mt-4 grid gap-3 md:grid-cols-2">{item.values.map((value, index) => <div key={`${value.value}-${index}`} className="rounded-md bg-background p-3"><p className="text-sm font-medium">{value.value}</p><div className="mt-2"><SourceChip source={value.source} /></div></div>)}</div><p className="mt-3 text-xs text-muted-foreground">{item.action}</p></div>)}</div> : <Empty text="Nenhuma contradição explícita foi encontrada." />}
           </Section>
 
@@ -276,7 +286,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             {data.documents.length ? <div className="divide-y divide-border">{data.documents.map((document) => <DocumentRow key={document.id} document={document} />)}</div> : <Empty text="Nenhum documento foi recebido." />}
           </Section>
 
-          <Section eyebrow="Comparação com o estado anterior" title="O que mudou?" icon={RefreshCw}>
+          <Section tab="timeline" eyebrow="Comparação com o estado anterior" title="O que mudou?" icon={RefreshCw}>
             {!data.changes.receivedAt ? <Empty text="Ainda não há uma entrada recente associada para comparar." /> : <div className="grid gap-4 md:grid-cols-2"><ChangeBlock title="Já sabíamos" items={data.changes.alreadyKnown.map((item) => `${item.label}: ${item.value}`)} /><ChangeBlock title="Novo" items={data.changes.newInformation.map((item) => item.title)} /><ChangeBlock title="Contradições" items={data.changes.contradictions.map((item) => item.title)} tone="danger" /><ChangeBlock title="Lacunas" items={[`${data.changes.resolvedGaps.length} resolvida(s)`, `${data.changes.newGaps.length} nova(s)`]} /></div>}
           </Section>
 
@@ -292,9 +302,12 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           <Section id="inteligencia" eyebrow="Recomendações, não fatos" title="Inteligência do caso" icon={Sparkles}>
             {data.intelligence.length ? <div className="divide-y divide-border">{data.intelligence.map((item) => <div key={item.id} className="py-4 first:pt-0"><div className="flex flex-wrap items-center gap-2"><RiskBadge value={item.impact} /><p className="font-medium">{item.action}</p></div><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{item.reasoning}</p><p className="mt-2 text-xs text-muted-foreground">{formatDate(item.timestamp)}{item.confidence != null ? ` · ${Math.round(item.confidence * 100)}% de confiança` : ""}</p></div>)}</div> : <Empty text="Ainda não há recomendações registradas para este caso." />}
           </Section>
+          <Section id="regras" eyebrow="Conhecimento municipal" title="Regras do processo" icon={BookOpenCheck}>
+            {data.case.municipalProcess?<MunicipalRulesPanel processId={data.case.municipalProcess.id} ticketId={data.case.municipalProcess.ticket?.id}/>:<Empty text="Este registro ainda não está vinculado a um processo municipal."/>}
+          </Section>
         </main>
 
-        <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+        {activeTab==="resumo"&&<aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
           <section className="rounded-xl border border-primary/20 bg-accent p-5">
             <p className="eyebrow">Próxima melhor ação</p>
             <h2 className="mt-3 text-lg font-semibold leading-6">{data.nextBestAction.title}</h2>
@@ -308,8 +321,8 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             {searchResult && <div className="mt-4 border-t border-border pt-4"><p className="text-sm font-medium">{searchResult.answer}</p><div className="mt-3 space-y-3">{searchResult.matches.slice(0, 5).map((match, index) => <div key={`${match.kind}-${index}`} className="rounded-lg bg-secondary p-3"><p className="text-xs font-semibold">{match.title}</p><p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">{match.text}</p><div className="mt-2"><SourceChip source={match.source} /></div></div>)}</div></div>}
           </section>
 
-        </aside>
-      </div>
+        </aside>}
+      </div></SectionVisibilityContext.Provider>
 
       <Dialog open={taskDialogOpen} onOpenChange={(open) => { if (!taskSaving) setTaskDialogOpen(open) }}>
         <DialogContent>
@@ -354,7 +367,9 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   )
 }
 
-function Section({ id, eyebrow, title, icon: Icon, action, children }: { id?: string; eyebrow: string; title: string; icon: typeof AlertTriangle; action?: React.ReactNode; children: React.ReactNode }) {
+function Section({ id, tab, eyebrow, title, icon: Icon, action, children }: { id?: string; tab?:CaseTab; eyebrow: string; title: string; icon: typeof AlertTriangle; action?: React.ReactNode; children: React.ReactNode }) {
+  const active=React.useContext(SectionVisibilityContext)
+  if(active&&active!==(tab||id))return null
   return <section id={id} className="surface-card scroll-mt-24 p-5 sm:p-6"><div className="mb-5 flex flex-col justify-between gap-3 border-b border-border pb-4 sm:flex-row sm:items-end"><div><p className="eyebrow flex items-center gap-2"><Icon className="h-3.5 w-3.5" />{eyebrow}</p><h2 className="mt-2 text-xl font-semibold tracking-tight">{title}</h2></div>{action}</div>{children}</section>
 }
 

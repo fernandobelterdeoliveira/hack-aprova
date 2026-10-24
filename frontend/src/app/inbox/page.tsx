@@ -74,7 +74,7 @@ type InboxItem = {
     embeddingProvider?: string
     candidates?: Array<{ caseId: string; caseNumber: string; clientName: string; caseType: string; score: number; signals: Array<{ detail: string; contribution: number }> }>
   } | null
-  detectedCase?: { id: string; caseNumber: string; clientName: string; caseType: string; municipalProcess?:{id:string;name:string;ticket:{id:string}|null}|null } | null
+  detectedCase?: { id: string; caseNumber: string; clientName: string; caseType: string; priority?:string; municipalProcess?:{id:string;name:string;department:string;ticket:{id:string}|null}|null } | null
   proposedChanges: ProposedChange[]
   processingRuns?: Array<{
     model: string
@@ -145,6 +145,9 @@ export default function InboxPage() {
   const [selectedChanges, setSelectedChanges] = useState<string[]>([])
   const [targetCaseId, setTargetCaseId] = useState("")
   const [query, setQuery] = useState("")
+  const [detailOpen,setDetailOpen]=useState(false)
+  const [sector,setSector]=useState("all")
+  const [returnSector,setReturnSector]=useState("all")
   const [mobileView, setMobileView] = useState<"list" | "detail">("list")
 
   const load = useCallback(async () => {
@@ -156,8 +159,8 @@ export default function InboxPage() {
       setItems(inboxData)
       setCases(casesData)
       const requestedId = new URLSearchParams(window.location.search).get("item")
-      setSelectedId((current) => requestedId && inboxData.some((item: InboxItem) => item.id === requestedId) ? requestedId : current || inboxData[0]?.id || null)
-      if (requestedId) setMobileView("detail")
+      setSelectedId((current) => requestedId && inboxData.some((item: InboxItem) => item.id === requestedId) ? requestedId : current || null)
+      if (requestedId) {setMobileView("detail");setDetailOpen(true)}
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ocorreu um erro inesperado")
     } finally {
@@ -174,24 +177,27 @@ export default function InboxPage() {
   }, [items, load])
 
   useEffect(() => {
-    const requestedFilter = new URLSearchParams(window.location.search).get("filter")
-    if (requestedFilter && ["pending", "needs_association", "approved", "rejected", "all"].includes(requestedFilter)) {
-      setFilter(requestedFilter)
-      setSelectedId(null)
-    }
+    const readLocation=()=>{const params=new URLSearchParams(window.location.search),requested=params.get("item");setSelectedId(requested);setDetailOpen(Boolean(requested));if(requested)setMobileView("detail");setFilter(params.get("filter")||(requested?"all":"pending"));setSector(params.get("sector")||"all")}
+    readLocation();window.addEventListener("popstate",readLocation);return()=>window.removeEventListener("popstate",readLocation)
   }, [])
+
+  function openItem(item:InboxItem,department=sector){if(!detailOpen)setReturnSector(sector);setSector(department);setSelectedId(item.id);setDetailOpen(true);setMobileView("detail");const url=new URL(window.location.href);url.searchParams.set("item",item.id);url.searchParams.set("filter",filter);if(department!=="all")url.searchParams.set("sector",department);else url.searchParams.delete("sector");window.history.pushState(null,"",url)}
+  function closeDetail(){setDetailOpen(false);setSelectedId(null);setSector(returnSector);setMobileView("list");const url=new URL(window.location.href);url.searchParams.delete("item");if(returnSector==="all")url.searchParams.delete("sector");else url.searchParams.set("sector",returnSector);window.history.replaceState(null,"",url)}
 
   const visibleItems = useMemo(() => items.filter((item) => {
     const matchesStatus = filter === "all"
       || (filter === "pending" && ["ready", "needs_association", "pending"].includes(item.reviewStatus))
       || item.reviewStatus === filter
     const normalized = query.trim().toLocaleLowerCase("pt-BR")
-    const haystack = [item.senderName, item.senderEmail, item.senderPhone, item.rawContent, item.fileName, item.detectedCase?.clientName, item.detectedCase?.caseNumber].filter(Boolean).join(" ").toLocaleLowerCase("pt-BR")
-    return matchesStatus && (!normalized || haystack.includes(normalized))
-  }), [filter, items, query])
+    const haystack = [item.senderName, item.senderEmail, item.senderPhone, item.rawContent, item.fileName, item.detectedCase?.clientName, item.detectedCase?.caseNumber,item.detectedCase?.caseType,item.detectedCase?.municipalProcess?.department].filter(Boolean).join(" ").toLocaleLowerCase("pt-BR")
+    return matchesStatus && (sector==="all"||inboxSector(item)===sector) && (!normalized || haystack.includes(normalized))
+  }), [filter, items, query,sector])
 
-  const selected = visibleItems.find((item) => item.id === selectedId) || visibleItems[0]
+  const selected = visibleItems.find((item) => item.id === selectedId) || (detailOpen?visibleItems[0]:undefined)
   const selectedJob = selected?.backgroundJobs?.[0]
+  const sectors=useMemo(()=>Array.from(new Set(items.map(inboxSector))).sort((a,b)=>a.localeCompare(b,"pt-BR")),[items])
+  const groups=useMemo(()=>Array.from(new Set(visibleItems.map(inboxSector))).sort((a,b)=>a.localeCompare(b,"pt-BR")).map(name=>({name,items:visibleItems.filter(item=>inboxSector(item)===name).sort((a,b)=>inboxPriority(b).rank-inboxPriority(a).rank||new Date(b.receivedAt).getTime()-new Date(a.receivedAt).getTime())})).sort((a,b)=>inboxPriority(b.items[0]).rank-inboxPriority(a.items[0]).rank||a.name.localeCompare(b.name,"pt-BR")),[visibleItems])
+
 
   useEffect(() => {
     if (!selected) return
@@ -233,6 +239,7 @@ export default function InboxPage() {
 
   const pendingCount = items.filter((item) => ["ready", "needs_association", "pending"].includes(item.reviewStatus)).length
 
+  const queueControls=<div className="space-y-3"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Buscar na fila" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Buscar município, processo ou mensagem" className="h-10 bg-muted/60 pl-9 shadow-none" /></div><div className="flex flex-wrap items-center gap-3"><div className="flex flex-wrap gap-1">{["all","pending","needs_association","approved","rejected"].map(value=><button key={value} onClick={()=>{setFilter(value);setSelectedId(null)}} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${filter===value?"bg-primary text-primary-foreground":"text-muted-foreground hover:bg-muted"}`}>{filterLabel[value]}</button>)}</div><select aria-label="Filtrar por setor" value={sector} onChange={event=>{setSector(event.target.value);setSelectedId(null)}} className="ml-auto max-w-full rounded-lg border border-border bg-background px-3 py-2 text-xs"><option value="all">Todos os setores</option>{sectors.map(name=><option key={name} value={name}>{name}</option>)}</select></div></div>
   return (
     <div className="space-y-4">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -248,35 +255,31 @@ export default function InboxPage() {
 
       {error && <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"><CircleAlert className="h-4 w-4" />{error}</div>}
 
+      {!detailOpen?<><div className="surface-card p-4">{queueControls}</div><p className="text-xs text-muted-foreground">{visibleItems.length} {visibleItems.length===1?"entrada":"entradas"} · {groups.length} {groups.length===1?"setor":"setores"}</p>{groups.length?<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{groups.map(group=><InboxCard key={group.name} item={group.items[0]} items={group.items} department={group.name} onClick={()=>openItem(group.items[0],group.name)}/>)}</div>:<div className="surface-card grid min-h-64 place-items-center p-8 text-center"><div><Check className="mx-auto mb-3 h-7 w-7 text-primary"/><p className="font-semibold">Nenhuma entrada nesta seleção</p><p className="mt-1 text-sm text-muted-foreground">Altere a busca, o setor ou o status.</p></div></div>}</>:<><Button variant="outline" onClick={closeDetail}><ArrowLeft className="mr-2 h-4 w-4"/>Voltar aos cards</Button>
       <div className="grid min-h-[620px] overflow-hidden rounded-2xl border border-border bg-card shadow-sm xl:h-[calc(100vh-132px)] xl:grid-cols-[380px_minmax(0,1fr)]">
         <aside className={`${mobileView === "detail" ? "hidden" : "flex"} min-h-0 flex-col xl:flex xl:border-r xl:border-border`}>
-          <div className="border-b border-border p-3">
-            <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar" className="h-10 bg-muted/60 pl-9 shadow-none" /></div>
-            <div className="mt-2 grid grid-cols-5 gap-1">
-            {["all", "pending", "needs_association", "approved", "rejected"].map((value) => <button key={value} onClick={() => { setFilter(value); setSelectedId(null) }} className={`min-w-0 rounded-lg px-1 py-2 text-[11px] font-semibold transition sm:text-xs ${filter === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>{filterLabel[value]}</button>)}
-            </div>
-          </div>
+          <div className="border-b border-border p-3">{queueControls}</div>
           <div className="scrollbar-hidden min-h-0 flex-1 divide-y divide-border overflow-y-auto overscroll-contain">
-            {visibleItems.length ? visibleItems.map((item) => <InboxRow key={item.id} item={item} active={selected?.id === item.id} onClick={() => { setSelectedId(item.id); setMobileView("detail") }} />) : <div className="grid min-h-[360px] place-items-center p-8 text-center"><div><Check className="mx-auto mb-3 h-7 w-7 text-primary" /><p className="text-sm font-semibold text-foreground">Nada por aqui</p><p className="mt-1 text-xs text-muted-foreground">Altere a busca ou escolha outra fila.</p></div></div>}
+            {visibleItems.length ? visibleItems.map((item) => <InboxRow key={item.id} item={item} active={selected?.id === item.id} onClick={() => openItem(item)} />) : <div className="grid min-h-[360px] place-items-center p-8 text-center"><div><Check className="mx-auto mb-3 h-7 w-7 text-primary" /><p className="text-sm font-semibold text-foreground">Nada por aqui</p><p className="mt-1 text-xs text-muted-foreground">Altere a busca ou escolha outra fila.</p></div></div>}
           </div>
         </aside>
 
         <main className={`${mobileView === "list" ? "hidden" : "block"} scrollbar-hidden min-w-0 overflow-y-auto overscroll-contain scroll-smooth bg-background xl:block`}>
           {selected ? (
             <div>
-              <header className="sticky top-0 z-20 border-b border-border bg-card/95 px-4 py-4 backdrop-blur md:px-6">
+              <header data-inbox-detail={selected.id} className="sticky top-0 z-20 border-b border-border bg-card/95 px-4 py-4 backdrop-blur md:px-6">
                 <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
                   <div className="flex min-w-0 gap-3">
-                    <button onClick={() => setMobileView("list")} className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground xl:hidden" aria-label="Voltar para a lista"><ArrowLeft className="h-4 w-4" /></button>
+                    <button onClick={closeDetail} className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground xl:hidden" aria-label="Voltar para a lista"><ArrowLeft className="h-4 w-4" /></button>
                     <SourceIcon source={selected.sourceType} />
-                    <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-foreground">{selected.senderName || selected.senderEmail || selected.senderPhone || "Remetente desconhecido"}</h2><Badge variant="outline" className="rounded-md capitalize">{selected.sourceType}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{new Date(selected.receivedAt).toLocaleString("pt-BR")} · {classificationLabel[selected.classification || "unknown"] || "Não classificada"}</p></div>
+                    <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-foreground">{inboxSender(selected)}</h2><Badge variant="outline" className="rounded-md capitalize">{selected.sourceType}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{new Date(selected.receivedAt).toLocaleString("pt-BR")} · {classificationLabel[selected.classification || "unknown"] || "Não classificada"}</p></div>
                   </div>
                   <ReviewBadge status={selected.reviewStatus} />
                 </div>
               </header>
 
-              <div className="grid gap-5 p-3 sm:p-5 lg:p-6 2xl:grid-cols-[minmax(0,1fr)_300px]">
-                <div className="space-y-5">
+              <div className="grid min-w-0 grid-cols-1 gap-5 p-3 sm:p-5 lg:p-6 2xl:grid-cols-[minmax(0,1fr)_300px]">
+                <div className="min-w-0 space-y-5">
                   {selectedJob && ["queued", "running", "failed", "dead_letter", "cancelled"].includes(selectedJob.status) && <section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-foreground">{selectedJob.status === "queued" ? "Aguardando processamento" : selectedJob.status === "running" ? "Processando entrada" : selectedJob.status === "dead_letter" ? "Processamento interrompido" : selectedJob.status === "cancelled" ? "Processamento cancelado" : "Falha no processamento"}</p><p className="mt-1 text-xs text-muted-foreground">{selectedJob.progressMessage || selectedJob.lastError}</p></div>{selectedJob.status === "running" && <Loader2 className="h-4 w-4 animate-spin text-primary" />}</div><div className="mt-3 h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full transition-all ${["failed", "dead_letter"].includes(selectedJob.status) ? "bg-destructive" : "bg-primary"}`} style={{ width: `${selectedJob.progress}%` }} /></div><p className="mt-2 text-right text-[10px] text-muted-foreground">{selectedJob.progress}%</p></section>}
                   <section className="flex items-start gap-3 rounded-xl border border-border bg-muted/45 px-4 py-3">
                     <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -287,7 +290,7 @@ export default function InboxPage() {
 
                   <section className="rounded-xl border border-border bg-card p-5">
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">O que chegou</p>
-                    <p className="mt-3 whitespace-pre-wrap text-[15px] leading-7 text-foreground">{selected.rawContent}</p>
+                    <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-7 text-foreground">{selected.rawContent}</p>
                     {selected.fileName && <div className="mt-4 flex items-center gap-2 rounded-lg bg-muted p-3 text-xs text-muted-foreground"><Paperclip className="h-4 w-4" />{selected.fileName}</div>}
                   </section>
 
@@ -299,7 +302,7 @@ export default function InboxPage() {
                   </section>
                 </div>
 
-                <aside className="space-y-4">
+                <aside className="min-w-0 space-y-4">
                   {selected.processingStatus === "completed" && ["ready", "needs_association", "pending"].includes(selected.reviewStatus) ? <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
                     <p className="text-sm font-semibold text-foreground">Sua decisão</p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">Apenas os itens selecionados serão adicionados ao caso.</p>
@@ -313,17 +316,17 @@ export default function InboxPage() {
                   </section> : selected.processingStatus !== "completed" ? <section className="rounded-xl border border-border bg-card p-5"><p className="text-sm font-semibold text-foreground">Análise em andamento</p><p className="mt-1 text-xs leading-5 text-muted-foreground">As opções de aprovação serão liberadas quando o worker concluir o processamento.</p></section> : <section className="rounded-xl border border-border bg-card p-5"><p className="text-sm font-semibold text-foreground">Revisão concluída</p><p className="mt-1 text-xs text-muted-foreground">Esta entrada foi {selected.reviewStatus === "approved" ? "aprovada e registrada no caso" : "descartada"}.</p></section>}
 
                   <section className="rounded-xl border border-border bg-card p-5">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Caso relacionado</p>
-                    {selected.detectedCase ? <div className="mt-3"><p className="text-sm font-semibold text-foreground">{selected.detectedCase.clientName}</p><p className="mt-1 text-xs text-muted-foreground">#{selected.detectedCase.caseNumber} · {selected.detectedCase.caseType}</p><div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-emerald-700"><Link href={`/cases/${selected.detectedCase.id}`}>Abrir caso →</Link>{selected.detectedCase.municipalProcess?.ticket&&<Link href={`/communications?ticket=${selected.detectedCase.municipalProcess.ticket.id}`}>Ticket e formulário →</Link>}</div><div className="mt-4"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confiança da associação</p><p className="mt-1 text-2xl font-semibold text-foreground">{selected.associationConfidence===null||selected.associationConfidence===undefined?"Vínculo manual":`${Math.round(selected.associationConfidence*100)}%`}</p></div></div> : <div className="mt-3 flex gap-2 text-sm text-amber-700 dark:text-amber-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />Escolha o caso correto antes de aprovar.</div>}
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Município relacionado</p>
+                    {selected.detectedCase ? <div className="mt-3"><p className="text-sm font-semibold text-foreground">{selected.detectedCase.clientName}</p><p className="mt-1 text-xs text-muted-foreground">#{selected.detectedCase.caseNumber} · {selected.detectedCase.caseType}</p><div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-emerald-700"><Link href={`/cases/${selected.detectedCase.id}`}>Abrir município →</Link>{selected.detectedCase.municipalProcess?.ticket&&<Link href={`/communications?ticket=${selected.detectedCase.municipalProcess.ticket.id}`}>Ticket e formulário →</Link>}</div><div className="mt-4"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confiança da associação</p><p className="mt-1 text-2xl font-semibold text-foreground">{selected.associationConfidence===null||selected.associationConfidence===undefined?"Vínculo manual":`${Math.round(selected.associationConfidence*100)}%`}</p></div></div> : <div className="mt-3 flex gap-2 text-sm text-amber-700 dark:text-amber-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />Escolha o caso correto antes de aprovar.</div>}
                     <div className="mt-4 border-t border-border pt-4">
-                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Alterar caso</Label>
-                      <Select value={targetCaseId} onValueChange={setTargetCaseId}><SelectTrigger className="mt-2 h-9 text-xs"><SelectValue placeholder="Selecione um caso" /></SelectTrigger><SelectContent>{cases.map((item) => <SelectItem key={item.id} value={item.id}>{item.clientName} · {item.caseType}</SelectItem>)}</SelectContent></Select>
+                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Alterar município</Label>
+                      <Select value={targetCaseId} onValueChange={setTargetCaseId}><SelectTrigger className="mt-2 h-9 w-full min-w-0 text-xs [&>span]:min-w-0 [&>span]:truncate"><SelectValue placeholder="Selecione município e processo" /></SelectTrigger><SelectContent>{cases.map((item) => <SelectItem key={item.id} value={item.id}>{item.clientName} · {item.caseType}</SelectItem>)}</SelectContent></Select>
                       {targetCaseId && targetCaseId !== selected.detectedCase?.id && <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => review("reassign")} disabled={working}>Confirmar outro caso</Button>}
                     </div>
                   </section>
 
                   <section className="rounded-xl border border-border bg-card p-5">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Por que este caso</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Por que este município</p>
                     <div className="mt-3 space-y-2">{selected.associationSignals?.candidates?.[0]?.signals?.length ? selected.associationSignals.candidates[0].signals.map((signal, index) => <div key={index} className="flex items-start gap-2 text-xs leading-5 text-muted-foreground"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />{signal.detail}</div>) : <p className="text-xs leading-5 text-muted-foreground">Nenhum sinal forte foi encontrado. Confirme o caso manualmente.</p>}</div>
                   </section>
                 </aside>
@@ -331,9 +334,20 @@ export default function InboxPage() {
             </div>
           ) : <div className="grid min-h-[650px] place-items-center text-center"><div><Inbox className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" /><p className="font-semibold text-foreground">Selecione uma entrada</p></div></div>}
         </main>
-      </div>
+      </div></>}
     </div>
   )
+}
+
+function inboxSender(item:InboxItem){const sender=item.senderName||item.senderEmail||item.senderPhone;return sender==="current-user"?"Equipe de implantação":sender||"Remetente não informado"}
+function inboxSector(item:InboxItem){return item.detectedCase?.municipalProcess?.department||"Setor não identificado"}
+function inboxPriority(item:InboxItem){
+ const values:Record<string,{rank:number;label:string;border:string;badge:string}>={urgent:{rank:4,label:"Urgente",border:"border-l-rose-500",badge:"bg-rose-50 text-rose-800"},critical:{rank:4,label:"Crítica",border:"border-l-rose-500",badge:"bg-rose-50 text-rose-800"},high:{rank:3,label:"Alta",border:"border-l-amber-500",badge:"bg-amber-50 text-amber-900"},medium:{rank:2,label:"Média",border:"border-l-blue-500",badge:"bg-blue-50 text-blue-800"},low:{rank:1,label:"Baixa",border:"border-l-emerald-500",badge:"bg-emerald-50 text-emerald-800"}}
+ return [values[item.riskLevel||""],values[item.detectedCase?.priority||""]].filter(Boolean).sort((a,b)=>b.rank-a.rank)[0]||{rank:0,label:"Não definida",border:"border-l-slate-300",badge:"bg-muted text-muted-foreground"}
+}
+function InboxCard({item,items,department,onClick}:{item:InboxItem;items:InboxItem[];department:string;onClick:()=>void}){
+ const priority=inboxPriority(item),municipalities=Array.from(new Set(items.map(i=>i.detectedCase?.clientName||"Município não associado"))),processes=new Set(items.map(i=>i.detectedCase?.id).filter(Boolean)).size,prefix=`${item.detectedCase?.clientName} · ${item.detectedCase?.caseType}\n\n`,summary=item.rawContent.startsWith(prefix)?item.rawContent.slice(prefix.length):item.rawContent,pending=items.filter(i=>["pending","ready","needs_association"].includes(i.reviewStatus)).length
+ return <button type="button" data-inbox-card={item.id} data-sector={department} data-priority={priority.label} onClick={onClick} className={`surface-card flex min-w-0 flex-col border-l-4 p-5 text-left transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary ${priority.border}`}><div className="flex w-full items-start justify-between gap-3"><div className="min-w-0"><h2 className="text-sm font-semibold">{department}</h2><p className="mt-1 text-xs text-muted-foreground">{municipalities.length===1?municipalities[0]:`${municipalities.length} municípios`} · {processes} {processes===1?"processo":"processos"}</p></div><span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold ${priority.badge}`}>Prioridade {priority.label.toLocaleLowerCase("pt-BR")}</span></div><div className="mt-4 flex flex-wrap gap-2 text-xs"><span className="rounded-md bg-secondary px-2 py-1">{items.length} {items.length===1?"entrada":"entradas"}</span><span className="rounded-md bg-secondary px-2 py-1">{pending} para revisar</span></div><p className="mt-4 text-[11px] font-medium text-primary">{item.detectedCase?.caseType||classificationLabel[item.classification||"unknown"]||"Informação recebida"}</p><p className="mt-2 line-clamp-3 flex-1 text-sm leading-6 text-muted-foreground">{summary}</p><div className="mt-4 flex w-full items-center justify-between gap-2"><ReviewBadge status={item.reviewStatus}/>{item.proposedChanges.length>0&&<span className="text-xs text-muted-foreground">{item.proposedChanges.length} sugestão(ões)</span>}</div><div className="mt-4 flex w-full items-end justify-between gap-3 border-t border-border pt-3 text-[11px] text-muted-foreground"><div className="min-w-0"><p className="truncate">{inboxSender(item)}</p><time className="mt-1 block">{new Date(item.receivedAt).toLocaleString("pt-BR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</time></div><span className="flex shrink-0 items-center gap-1 font-medium text-primary">Abrir setor<ChevronRight className="h-3.5 w-3.5"/></span></div></button>
 }
 
 function InboxRow({ item, active, onClick }: { item: InboxItem; active: boolean; onClick: () => void }) {
