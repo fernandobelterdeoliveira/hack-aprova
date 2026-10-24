@@ -2,6 +2,8 @@
 
 A base local contém **oito processos em quatro prefeituras fictícias**, todos vinculados a Municípios, Caixa de entrada e Ticket. Há dois percursos de alvará: um para executar o teste e outro já concluído pelas APIs como referência. Regras, nomes e documentos são exemplos sem validade normativa. Não houve envio externo nem ganho de produtividade presumido.
 
+A navegação agora usa **Ticket** para as entradas por setor (`/inbox`) e **Formulários** para a área de coleta, geração e revisão (`/communications`). Os nomes técnicos de Ticket nas APIs e nos registros históricos permanecem compatíveis.
+
 ## Comece aqui
 
 - **Municípios:** http://127.0.0.1:3001/cases

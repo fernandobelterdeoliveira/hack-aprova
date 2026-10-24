@@ -71,7 +71,7 @@ export function GlobalSearch() {
           {loading ? <div className="flex items-center justify-center gap-2 p-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Pesquisando...</div> : hasResults ? (
             <div className="space-y-2">
               <ResultGroup title="Municípios" icon={BriefcaseBusiness}>{results.cases.map((item) => <ResultLink key={item.id} href={`/cases/${item.id}`} title={`${item.clientName} · #${item.caseNumber}`} detail={item.caseType} onOpen={() => setOpen(false)} />)}</ResultGroup>
-              <ResultGroup title="Fila" icon={Inbox}>{results.inbox.map((item) => <ResultLink key={item.id} href={`/inbox?item=${item.id}`} title={item.senderName || item.senderEmail || "Remetente desconhecido"} detail={item.rawContent} onOpen={() => setOpen(false)} />)}</ResultGroup>
+              <ResultGroup title="Ticket" icon={Inbox}>{results.inbox.map((item) => <ResultLink key={item.id} href={`/inbox?item=${item.id}`} title={item.senderName || item.senderEmail || "Remetente desconhecido"} detail={item.rawContent} onOpen={() => setOpen(false)} />)}</ResultGroup>
               <ResultGroup title="Documentos" icon={FileText}>{results.files.map((item) => <ResultLink key={item.id} href={`/cases/${item.case.id}`} title={item.name} detail={`${item.case.clientName} · #${item.case.caseNumber}`} onOpen={() => setOpen(false)} />)}</ResultGroup>
             </div>
           ) : <div className="p-8 text-center"><Search className="mx-auto h-6 w-6 text-slate-300" /><p className="mt-2 text-sm font-medium text-slate-700">Nenhum resultado encontrado</p><p className="mt-1 text-xs text-slate-400">Tente nome, número do caso, documento ou mensagem.</p></div>}

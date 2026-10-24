@@ -154,7 +154,7 @@ export default function InboxPage() {
     try {
       setError(null)
       const [inboxResponse, casesResponse] = await Promise.all([fetch("/api/inbox"), fetch("/api/cases")])
-      if (!inboxResponse.ok || !casesResponse.ok) throw new Error("Não foi possível carregar a fila de ingestão")
+      if (!inboxResponse.ok || !casesResponse.ok) throw new Error("Não foi possível carregar os tickets")
       const [inboxData, casesData] = await Promise.all([inboxResponse.json(), casesResponse.json()])
       setItems(inboxData)
       setCases(casesData)
@@ -239,16 +239,16 @@ export default function InboxPage() {
 
   const pendingCount = items.filter((item) => ["ready", "needs_association", "pending"].includes(item.reviewStatus)).length
 
-  const queueControls=<div className="space-y-3"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Buscar na fila" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Buscar município, processo ou mensagem" className="h-10 bg-muted/60 pl-9 shadow-none" /></div><div className="flex flex-wrap items-center gap-3"><div className="flex flex-wrap gap-1">{["all","pending","needs_association","approved","rejected"].map(value=><button key={value} onClick={()=>{setFilter(value);setSelectedId(null)}} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${filter===value?"bg-primary text-primary-foreground":"text-muted-foreground hover:bg-muted"}`}>{filterLabel[value]}</button>)}</div><select aria-label="Filtrar por setor" value={sector} onChange={event=>{setSector(event.target.value);setSelectedId(null)}} className="ml-auto max-w-full rounded-lg border border-border bg-background px-3 py-2 text-xs"><option value="all">Todos os setores</option>{sectors.map(name=><option key={name} value={name}>{name}</option>)}</select></div></div>
+  const queueControls=<div className="space-y-3"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Buscar tickets" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Buscar município, processo ou mensagem" className="h-10 bg-muted/60 pl-9 shadow-none" /></div><div className="flex flex-wrap items-center gap-3"><div className="flex flex-wrap gap-1">{["all","pending","needs_association","approved","rejected"].map(value=><button key={value} onClick={()=>{setFilter(value);setSelectedId(null)}} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${filter===value?"bg-primary text-primary-foreground":"text-muted-foreground hover:bg-muted"}`}>{filterLabel[value]}</button>)}</div><select aria-label="Filtrar por setor" value={sector} onChange={event=>{setSector(event.target.value);setSelectedId(null)}} className="ml-auto max-w-full rounded-lg border border-border bg-background px-3 py-2 text-xs"><option value="all">Todos os setores</option>{sectors.map(name=><option key={name} value={name}>{name}</option>)}</select></div></div>
   return (
     <div className="space-y-4">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
-          <h1 className="page-title">Fila</h1>
+          <h1 className="page-title">Ticket</h1>
           {pendingCount > 0 && <Badge className="border-0 bg-accent text-accent-foreground shadow-none">{pendingCount} para revisar</Badge>}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={load} aria-label="Atualizar fila"><RefreshCw className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={load} aria-label="Atualizar tickets"><RefreshCw className="h-4 w-4" /></Button>
           <NewItemDialog open={newOpen} onOpenChange={setNewOpen} onCreated={async () => { setNewOpen(false); await load() }} />
         </div>
       </div>
@@ -260,7 +260,7 @@ export default function InboxPage() {
         <aside className={`${mobileView === "detail" ? "hidden" : "flex"} min-h-0 flex-col xl:flex xl:border-r xl:border-border`}>
           <div className="border-b border-border p-3">{queueControls}</div>
           <div className="scrollbar-hidden min-h-0 flex-1 divide-y divide-border overflow-y-auto overscroll-contain">
-            {visibleItems.length ? visibleItems.map((item) => <InboxRow key={item.id} item={item} active={selected?.id === item.id} onClick={() => openItem(item)} />) : <div className="grid min-h-[360px] place-items-center p-8 text-center"><div><Check className="mx-auto mb-3 h-7 w-7 text-primary" /><p className="text-sm font-semibold text-foreground">Nada por aqui</p><p className="mt-1 text-xs text-muted-foreground">Altere a busca ou escolha outra fila.</p></div></div>}
+            {visibleItems.length ? visibleItems.map((item) => <InboxRow key={item.id} item={item} active={selected?.id === item.id} onClick={() => openItem(item)} />) : <div className="grid min-h-[360px] place-items-center p-8 text-center"><div><Check className="mx-auto mb-3 h-7 w-7 text-primary" /><p className="text-sm font-semibold text-foreground">Nada por aqui</p><p className="mt-1 text-xs text-muted-foreground">Altere a busca, o setor ou o status.</p></div></div>}
           </div>
         </aside>
 
@@ -317,7 +317,7 @@ export default function InboxPage() {
 
                   <section className="rounded-xl border border-border bg-card p-5">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Município relacionado</p>
-                    {selected.detectedCase ? <div className="mt-3"><p className="text-sm font-semibold text-foreground">{selected.detectedCase.clientName}</p><p className="mt-1 text-xs text-muted-foreground">#{selected.detectedCase.caseNumber} · {selected.detectedCase.caseType}</p><div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-emerald-700"><Link href={`/cases/${selected.detectedCase.id}`}>Abrir município →</Link>{selected.detectedCase.municipalProcess?.ticket&&<Link href={`/communications?ticket=${selected.detectedCase.municipalProcess.ticket.id}`}>Ticket e formulário →</Link>}</div><div className="mt-4"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confiança da associação</p><p className="mt-1 text-2xl font-semibold text-foreground">{selected.associationConfidence===null||selected.associationConfidence===undefined?"Vínculo manual":`${Math.round(selected.associationConfidence*100)}%`}</p></div></div> : <div className="mt-3 flex gap-2 text-sm text-amber-700 dark:text-amber-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />Escolha o caso correto antes de aprovar.</div>}
+                    {selected.detectedCase ? <div className="mt-3"><p className="text-sm font-semibold text-foreground">{selected.detectedCase.clientName}</p><p className="mt-1 text-xs text-muted-foreground">#{selected.detectedCase.caseNumber} · {selected.detectedCase.caseType}</p><div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-emerald-700"><Link href={`/cases/${selected.detectedCase.id}`}>Abrir município →</Link>{selected.detectedCase.municipalProcess?.ticket&&<Link href={`/communications?ticket=${selected.detectedCase.municipalProcess.ticket.id}`}>Abrir formulários →</Link>}</div><div className="mt-4"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confiança da associação</p><p className="mt-1 text-2xl font-semibold text-foreground">{selected.associationConfidence===null||selected.associationConfidence===undefined?"Vínculo manual":`${Math.round(selected.associationConfidence*100)}%`}</p></div></div> : <div className="mt-3 flex gap-2 text-sm text-amber-700 dark:text-amber-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />Escolha o caso correto antes de aprovar.</div>}
                     <div className="mt-4 border-t border-border pt-4">
                       <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Alterar município</Label>
                       <Select value={targetCaseId} onValueChange={setTargetCaseId}><SelectTrigger className="mt-2 h-9 w-full min-w-0 text-xs [&>span]:min-w-0 [&>span]:truncate"><SelectValue placeholder="Selecione município e processo" /></SelectTrigger><SelectContent>{cases.map((item) => <SelectItem key={item.id} value={item.id}>{item.clientName} · {item.caseType}</SelectItem>)}</SelectContent></Select>

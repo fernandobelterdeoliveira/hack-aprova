@@ -225,7 +225,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             <div className="flex flex-wrap items-center gap-3"><h1 className="page-title">{data.case.clientName}</h1><Badge variant="outline">{data.case.caseNumber}</Badge></div>
             <p className="mt-2 text-sm text-muted-foreground">{data.case.caseType} · Responsável: <span className="font-medium text-foreground">{data.case.assignedTo}</span></p>
             <p className="mt-1 text-xs text-muted-foreground">Atualizado {relativeDate(data.case.lastActivity)}</p>
-            {data.case.municipalProcess&&<div className="mt-3 flex flex-wrap gap-4 text-xs font-medium text-emerald-700"><Link href={`/municipal?process=${data.case.municipalProcess.id}`}>Regras e fontes municipais →</Link>{data.case.municipalProcess.ticket&&<Link href={`/communications?ticket=${data.case.municipalProcess.ticket.id}`}>Abrir Ticket e formulário →</Link>}</div>}
+            {data.case.municipalProcess&&<div className="mt-3 flex flex-wrap gap-4 text-xs font-medium text-emerald-700"><Link href={`/municipal?process=${data.case.municipalProcess.id}`}>Regras e fontes municipais →</Link>{data.case.municipalProcess.ticket&&<Link href={`/communications?ticket=${data.case.municipalProcess.ticket.id}`}>Abrir formulários →</Link>}</div>}
           </div>
           <Select value={data.case.status} onValueChange={updateStatus}><SelectTrigger className="w-full sm:w-[170px]"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(statusLabel).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select>
         </div>

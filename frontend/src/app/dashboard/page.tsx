@@ -103,7 +103,7 @@ export default function DashboardPage() {
           <p className="mt-2 text-sm text-slate-500">{today} · Veja o que precisa de atenção nos processos municipais.</p>
         </div>
         <Button asChild className="action-primary h-10 rounded-lg px-4">
-          <Link href="/inbox">Abrir fila <ArrowRight className="ml-2 h-4 w-4" /></Link>
+          <Link href="/inbox">Abrir Ticket <ArrowRight className="ml-2 h-4 w-4" /></Link>
         </Button>
       </section>
 

@@ -2,14 +2,14 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Building2, Inbox, MessageSquare, Settings } from "lucide-react"
+import { LayoutDashboard, Building2, Inbox, FileText, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
   { href: "/dashboard", label: "Visão geral", icon: LayoutDashboard },
-  { href: "/inbox", label: "Fila", icon: Inbox },
+  { href: "/inbox", label: "Ticket", icon: Inbox },
   { href: "/cases", label: "Municípios", icon: Building2 },
-  { href: "/communications", label: "Ticket", icon: MessageSquare },
+  { href: "/communications", label: "Formulários", icon: FileText },
   { href: "/settings", label: "Configurações", icon: Settings },
 ]
 
